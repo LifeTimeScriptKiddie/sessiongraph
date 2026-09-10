@@ -74,7 +74,7 @@ def _parser() -> argparse.ArgumentParser:
     suggest_parser.add_argument("source", help="analysis.json, report directory, or session JSONL")
     suggest_parser.add_argument(
         "--target",
-        choices=("markdown", "claude", "agentctl"),
+        choices=("markdown", "claude", "agentctl", "pi"),
         default="markdown",
         help="artifact target (default: markdown)",
     )

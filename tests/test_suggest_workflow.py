@@ -64,6 +64,95 @@ class SuggestWorkflowTests(unittest.TestCase):
             self.assertTrue((out / "rationale.md").is_file())
             self.assertTrue((out / "analysis.json").is_file())
 
+    def test_pi_target(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            analysis = self._write_analysis(root)
+            out = root / "out-pi"
+            self.assertEqual(
+                main(["suggest-workflow", str(analysis), "--target", "pi", "--out", str(out)]),
+                0,
+            )
+            js = (out / "workflow.js").read_text(encoding="utf-8")
+            self.assertTrue(js.lstrip().startswith("export const meta"))
+            self.assertIn("name:", js)
+            self.assertIn("description:", js)
+            self.assertIn("agent(", js)
+            self.assertIn("phase(", js)
+            self.assertIn("budget", js)
+            self.assertNotIn("export async function run", js)
+            self.assertNotIn("PLEASE_PASTE_MY_SECRET_PROMPT", js)
+            manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["target"], "pi")
+            self.assertEqual(manifest["mapping_version"], MAPPING_VERSION)
+
+    def test_pi_meta_name_from_primary_finding(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            analysis = self._write_analysis(root)
+            out = root / "out"
+            suggest_workflow(analysis, target="pi", out=out, task="fix the loop")
+            js = (out / "workflow.js").read_text(encoding="utf-8")
+            # Fixture primary is errors (spine priority over repeated_action).
+            self.assertIn('name: "sg_errors_repair"', js)
+            self.assertIn("const task = (args && args.task)", js)
+            self.assertIn("fix the loop", js)
+
+    def test_pi_does_not_embed_transcript_text(self):
+        body = dict(FIXTURE_ANALYSIS)
+        body["findings"] = [
+            {
+                "code": "dead_end",
+                "severity": "warning",
+                "summary": "user said PLEASE_PASTE_MY_SECRET_PROMPT into the tool",
+                "evidence": ["e1"],
+                "recommendation": "handoff",
+            }
+        ]
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            analysis = self._write_analysis(root, body)
+            out = root / "out"
+            suggest_workflow(analysis, target="pi", out=out)
+            js = (out / "workflow.js").read_text(encoding="utf-8")
+            self.assertNotIn("PLEASE_PASTE_MY_SECRET_PROMPT", js)
+            self.assertIn('name: "sg_dead_end_repair"', js)
+            self.assertIn("terminal handoff", js)
+
+    def test_pi_pipeline_contract_phases(self):
+        body = {
+            "schema_version": 1,
+            "session": {"id": "pipe", "format": "pipeline", "source": "x", "metadata": {}},
+            "metrics": {
+                "workflow_health": 28,
+                "pipeline_success": 0,
+                "pipeline_checks_missing": 1,
+                "tool_calls": 0,
+                "events": 0,
+                "branches": 0,
+            },
+            "findings": [
+                {
+                    "code": "pipeline_contract",
+                    "severity": "critical",
+                    "summary": "missing final-report",
+                    "evidence": ["final-report"],
+                    "recommendation": "restore producer",
+                }
+            ],
+            "graph": {"nodes": [], "edges": []},
+        }
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            analysis = self._write_analysis(root, body)
+            out = root / "out"
+            suggest_workflow(analysis, target="pi", out=out, task="restore final-report gate")
+            js = (out / "workflow.js").read_text(encoding="utf-8")
+            self.assertIn('name: "sg_pipeline_contract_repair"', js)
+            self.assertIn("check-contract", js)
+            self.assertIn("repair-producer", js)
+            self.assertIn("verify-artifacts", js)
+
     def test_claude_target(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -211,6 +300,10 @@ class SuggestWorkflowTests(unittest.TestCase):
             ), patch("os.system", _blocked):
                 self.assertEqual(
                     main(["suggest-workflow", str(analysis), "--target", "agentctl", "--out", str(out)]),
+                    0,
+                )
+                self.assertEqual(
+                    main(["suggest-workflow", str(analysis), "--target", "pi", "--out", str(out / "pi")]),
                     0,
                 )
 
