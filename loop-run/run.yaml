@@ -1,0 +1,19 @@
+runId: sessiongraph-workflow-improvement
+maxIterations: 3
+taskType: document_draft
+budgets:
+  wallClockSeconds: 600
+  noProgressRounds: 2
+  repeatedFailureRounds: 2
+validation:
+  requiredHeadings:
+    - "## Evidence"
+    - "## Proposed change"
+    - "## Experiment"
+  forbiddenPatterns:
+    - "TODO"
+    - "FIXME"
+  minScore: 0.9
+adapters:
+  generator: pi
+  evaluator: codex
