@@ -1,0 +1,8 @@
+{"ts":"2026-09-09T10:00:00Z","event":"generate","iteration":1,"adapter":"pi","ok":true,"failureClass":null,"durationMs":1200,"candidateHash":"abc"}
+{"ts":"2026-09-09T10:00:01Z","event":"validate","iteration":1,"passed":true,"checks":[{"id":"required_heading","passed":true}]}
+{"ts":"2026-09-09T10:00:02Z","event":"evaluate","iteration":1,"adapter":"codex","ok":true,"durationMs":900}
+{"ts":"2026-09-09T10:00:03Z","event":"decision","iteration":1,"action":"retry","reason":"score below threshold","score":0.7,"dryRun":false}
+{"ts":"2026-09-09T10:00:04Z","event":"generate","iteration":2,"adapter":"pi","ok":false,"failureClass":"timeout","durationMs":300000,"candidateHash":"def"}
+{"ts":"2026-09-09T10:05:04Z","event":"validate","iteration":2,"passed":false,"checks":[]}
+{"ts":"2026-09-09T10:05:05Z","event":"decision","iteration":2,"action":"stop","reason":"reached retry budget","score":0,"dryRun":false}
+{"ts":"2026-09-09T10:05:05Z","event":"finish","iteration":2,"status":"stopped","reason":"reached retry budget"}
