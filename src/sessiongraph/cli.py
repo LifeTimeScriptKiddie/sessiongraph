@@ -9,6 +9,7 @@ from .analyze import analyze, compare
 from .parsers import discover_pi_sessions, load_session
 from .report import write_bundle
 from .retrieval import load_retrieval
+from .suggest import default_out_dir, suggest_workflow
 
 
 LOOP_RUN_YAML = """runId: sessiongraph-workflow-improvement
@@ -62,6 +63,25 @@ def _parser() -> argparse.ArgumentParser:
     loop_parser = sub.add_parser("prepare-loop", help="prepare an agentctl run from a content-free report")
     loop_parser.add_argument("report")
     loop_parser.add_argument("--out", required=True)
+    suggest_parser = sub.add_parser(
+        "suggest-workflow",
+        help="emit a suggested dynamic workflow sketch from analysis findings (no auto-run)",
+    )
+    suggest_parser.add_argument("source", help="analysis.json, report directory, or session JSONL")
+    suggest_parser.add_argument(
+        "--target",
+        choices=("markdown", "claude", "agentctl"),
+        default="markdown",
+        help="artifact target (default: markdown)",
+    )
+    suggest_parser.add_argument("--out", help="output directory (default: .sessiongraph/suggest-<target>-<utc>)")
+    suggest_parser.add_argument("--task", help="optional one-line task label copied into artifact headers")
+    suggest_parser.add_argument("--max-findings", type=int, default=3, help="severity-ranked finding cap (default: 3)")
+    suggest_parser.add_argument(
+        "--include-healthy",
+        action="store_true",
+        help="if no findings, emit a linear healthy template instead of skipping",
+    )
     return parser
 
 
@@ -97,6 +117,18 @@ def main(argv: list[str] | None = None) -> int:
             (destination / "rubric.md").write_text(LOOP_RUBRIC, encoding="utf-8")
             (destination / "run.yaml").write_text(LOOP_RUN_YAML, encoding="utf-8")
             print(f"wrote agentctl run directory {destination}")
+            return 0
+        if args.command == "suggest-workflow":
+            destination = Path(args.out).resolve() if args.out else default_out_dir(args.target)
+            written = suggest_workflow(
+                Path(args.source),
+                target=args.target,
+                out=destination,
+                task=args.task,
+                max_findings=args.max_findings,
+                include_healthy=args.include_healthy,
+            )
+            print(f"wrote {written}")
             return 0
         before = json.loads(Path(args.before).read_text(encoding="utf-8"))
         after = json.loads(Path(args.after).read_text(encoding="utf-8"))

@@ -6,6 +6,13 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- `sessiongraph suggest-workflow`: deterministic finding→topology compiler
+  (`suggest-map-v1`) that emits markdown / Claude `workflow.js` / agentctl
+  sketches from `analysis.json`, a report directory, or session JSONL. Stdlib
+  only; never auto-runs agents or patches user repos. See
+  `docs/suggest-workflow.md`.
+
 ### Changed
 - `errors` finding now reports **unrecovered** errors only: an errored tool
   call whose same signature succeeds later in the session is treated as

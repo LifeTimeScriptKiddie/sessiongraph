@@ -40,7 +40,8 @@ The outputs are:
 SessionGraph separates observation from causal evaluation:
 
 ```text
-session -> deterministic findings -> one workflow hypothesis
+session -> deterministic findings -> suggest-workflow (optional)
+        -> human / Claude Workflow / agentctl applies sketch
         -> comparable candidate sessions -> before/after comparison -> keep or roll back
 ```
 
@@ -52,7 +53,23 @@ sessiongraph analyze candidate.jsonl --out .sessiongraph/candidate
 sessiongraph compare .sessiongraph/baseline/analysis.json .sessiongraph/candidate/analysis.json
 ```
 
-For an optional `agentctl` critique-and-revision loop, generate a self-contained run directory and run it:
+Emit a **suggested dynamic workflow** from findings (stdlib-only; never auto-runs agents):
+
+```bash
+sessiongraph suggest-workflow .sessiongraph/baseline/analysis.json --target markdown --out .sessiongraph/suggest-md
+sessiongraph suggest-workflow .sessiongraph/baseline --target claude --out .sessiongraph/suggest-claude
+sessiongraph suggest-workflow .sessiongraph/baseline --target agentctl --out .sessiongraph/suggest-agentctl
+```
+
+| `--target` | Primary artifacts |
+|------------|-------------------|
+| `markdown` | `workflow.md` DAG + experiment |
+| `claude` | `workflow.js` sketch (`agent` / `parallel` / `pipeline` / `phase` / `budget`) |
+| `agentctl` | `task.md` + `run.yaml` + `rubric.md` (operator runs `agentctl` separately) |
+
+Always also writes `manifest.json`, `rationale.md`, and a copy of `analysis.json`. Mapping version: `suggest-map-v1`. See [`docs/suggest-workflow.md`](docs/suggest-workflow.md).
+
+For a generic critique-and-revision loop (less topology-aware), `prepare-loop` remains available:
 
 ```bash
 sessiongraph prepare-loop .sessiongraph/baseline/report.md --out .sessiongraph/agentctl-loop
@@ -70,7 +87,7 @@ unrolled `generate → validate → evaluate → decision → retry/finish` grap
 iterations, retry count, final status, stage duration, bottlenecks, failed stages, and timeouts
 without copying prompts or candidate text.
 
-`agentctl run` mutates its checkpoint and creates candidate/evaluation artifacts. The generated task embeds only the content-free report, not the source transcript. `loop-run/` contains the human-readable configuration and rubric used by `prepare-loop`.
+`agentctl run` mutates its checkpoint and creates candidate/evaluation artifacts. The generated task embeds only the content-free report, not the source transcript. `loop-run/` contains the human-readable configuration and rubric used by `prepare-loop`. Prefer `suggest-workflow --target agentctl` when you want finding→topology budgets instead of a generic improvement prompt.
 
 ## CodeCollector retrieval reports
 
