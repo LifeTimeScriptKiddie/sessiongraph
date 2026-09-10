@@ -18,6 +18,7 @@ SEVERITY_RANK = {"critical": 0, "warning": 1, "info": 2}
 
 # Spine ownership: lower rank wins when severities tie.
 SPINE_PRIORITY = {
+    "pipeline_contract": -1,
     "dead_end": 0,
     "errors": 1,
     "alternating_loop": 2,
@@ -52,6 +53,17 @@ class TopologyRule:
 
 
 MAPPING: dict[str, TopologyRule] = {
+    "pipeline_contract": TopologyRule(
+        code="pipeline_contract",
+        role="spine",
+        topology_move="Fix the producer and rerun the unchanged external verification contract",
+        markdown_nodes=("Start", "CheckContract", "RepairProducer", "VerifyArtifacts", "Handoff", "Done"),
+        markdown_guards=("Keep fixture, verifier and required checks fixed", "Do not replace failed checks with process-success claims"),
+        expected_metric="pipeline_checks_required unchanged; pipeline_checks_failed and pipeline_checks_missing reach zero; pipeline_success becomes 1",
+        claude_phases=("check-contract", "repair-producer", "verify-artifacts"),
+        agentctl_headings=("## Verification contract", "## Check evidence"),
+        requires_handoff=True,
+    ),
     "repeated_action": TopologyRule(
         code="repeated_action",
         role="spine",

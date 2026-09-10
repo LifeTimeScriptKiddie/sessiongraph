@@ -50,6 +50,15 @@ def markdown(analysis: dict[str, Any]) -> str:
             f"- Retrieval attempts / unsuccessful: {metrics['retrieval_attempts']} / {metrics['retrieval_unsuccessful_attempts']}",
             f"- Recorded retrieval time: {metrics['retrieval_elapsed_s']} s; success: {bool(metrics['retrieval_success'])}",
         ]
+    if "pipeline_checks_required" in metrics:
+        lines[4:4] = [
+            f"- Reported verification: **{metrics['pipeline_checks_passed']}/{metrics['pipeline_checks_required']} checks passed**; "
+            f"failed: {metrics['pipeline_checks_failed']}; missing: {metrics['pipeline_checks_missing']}",
+            f"- Completed stages: {metrics['pipeline_stages_completed']}/{metrics['pipeline_stages_required']}; "
+            f"missing: {metrics['pipeline_stages_missing']}; timeouts: {metrics['pipeline_timeouts']}",
+            f"- Contract satisfied: **{bool(metrics['pipeline_success'])}**; recorded stage time: {metrics['pipeline_duration_ms']} ms",
+            "- Verdicts come from the supplied verifier record. SessionGraph does not execute checks or certify their truth.",
+        ]
     if not analysis["findings"]:
         lines.append("No deterministic loop or dead-end signals were detected.")
     for finding in analysis["findings"]:

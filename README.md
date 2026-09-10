@@ -89,6 +89,42 @@ without copying prompts or candidate text.
 
 `agentctl run` mutates its checkpoint and creates candidate/evaluation artifacts. The generated task embeds only the content-free report, not the source transcript. `loop-run/` contains the human-readable configuration and rubric used by `prepare-loop`. Prefer `suggest-workflow --target agentctl` when you want finding→topology budgets instead of a generic improvement prompt.
 
+## Pipeline verification records
+
+Use `analyze-pipeline` for an actual ordered pipeline whose external verifier records
+stage outcomes and artifact checks. It separates **process completion** from
+**reported contract satisfaction**; missing required checks never count as passes.
+
+```bash
+sessiongraph analyze-pipeline baseline/pipeline.json --out baseline/analysis
+sessiongraph analyze-pipeline candidate/pipeline.json --out candidate/analysis
+sessiongraph compare baseline/analysis/analysis.json candidate/analysis/analysis.json
+sessiongraph suggest-workflow baseline/analysis --target agentctl --out proposed-repair
+```
+
+The JSON format is `schema: "sessiongraph.pipeline.v1"` with:
+
+- `fixture_sha256`, `verifier_sha256`: lowercase SHA256 hashes identifying the
+  fixed input and check implementation; optional `source_sha256` identifies the producer revision.
+- `required_stages`: nonempty ordered array of unique stage IDs.
+- `required_checks`: nonempty object mapping each required check ID to its stage ID.
+- `stages`: recorded stages in declared order, each with `id`, `status`
+  (`completed`, `failed`, `blocked`, `timeout`), finite nonnegative `duration_ms`,
+  and `checks`: objects containing `id`, boolean `passed`, and `evidence_sha256`.
+
+The adapter exports ordinal stage/check IDs and evidence hashes, not commands,
+targets, stage names or artifact contents. It does not read referenced evidence,
+run checks, or certify a verifier's claims. Metrics cover required/passed/failed/missing
+checks, completed/missing stages, timeouts and summed stage duration. Successful
+verification requires every declared stage completed and every required check passed.
+Failed verification produces a `pipeline_contract` finding and a contract-preserving
+workflow suggestion. Suggestions never run automatically.
+
+Pipeline comparison rejects different fixture, verifier or declared-contract hashes,
+and rejects mixing pipeline records with wrapper/session formats. The producer revision
+may change. Matching hashes establish comparable recorded checks, not a statistically
+proven causal improvement; runtime is recorded stage time, not total wall-clock time.
+
 ## CodeCollector retrieval reports
 
 Analyze saved JSON from `insane_research_standalone/standalone_fetch.py`:
