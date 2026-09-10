@@ -7,15 +7,18 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `suggest-workflow --target pi`: emit pi-dynamic-workflows-compatible
+  `workflow.js` (`export const meta` + top-level `await`). Same
+  `suggest-map-v1` topology as other targets; never auto-runs Pi.
 - `analyze-pipeline`: ordered pipeline contracts with externally recorded artifact
   checks, missing-check accounting, stage timeouts, content-free evidence hashes,
   and contract-preserving `pipeline_contract` workflow suggestions. Pipeline
   comparisons require matching fixture, verifier and contract hashes.
 - `sessiongraph suggest-workflow`: deterministic finding→topology compiler
-  (`suggest-map-v1`) that emits markdown / Claude `workflow.js` / agentctl
-  sketches from `analysis.json`, a report directory, or session JSONL. Stdlib
-  only; never auto-runs agents or patches user repos. See
-  `docs/suggest-workflow.md`.
+  (`suggest-map-v1`) that emits markdown / Claude `workflow.js` /
+  pi-dynamic-workflows `workflow.js` / agentctl sketches from `analysis.json`,
+  a report directory, or session JSONL. Stdlib only; never auto-runs agents or
+  patches user repos. See `docs/suggest-workflow.md`.
 
 ### Changed
 - `errors` finding now reports **unrecovered** errors only: an errored tool

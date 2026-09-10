@@ -41,7 +41,7 @@ SessionGraph separates observation from causal evaluation:
 
 ```text
 session -> deterministic findings -> suggest-workflow (optional)
-        -> human / Claude Workflow / agentctl applies sketch
+        -> human / Claude Workflow / pi-dynamic-workflows / agentctl applies sketch
         -> comparable candidate sessions -> before/after comparison -> keep or roll back
 ```
 
@@ -58,13 +58,15 @@ Emit a **suggested dynamic workflow** from findings (stdlib-only; never auto-run
 ```bash
 sessiongraph suggest-workflow .sessiongraph/baseline/analysis.json --target markdown --out .sessiongraph/suggest-md
 sessiongraph suggest-workflow .sessiongraph/baseline --target claude --out .sessiongraph/suggest-claude
+sessiongraph suggest-workflow .sessiongraph/baseline --target pi --out .sessiongraph/suggest-pi
 sessiongraph suggest-workflow .sessiongraph/baseline --target agentctl --out .sessiongraph/suggest-agentctl
 ```
 
 | `--target` | Primary artifacts |
 |------------|-------------------|
 | `markdown` | `workflow.md` DAG + experiment |
-| `claude` | `workflow.js` sketch (`agent` / `parallel` / `pipeline` / `phase` / `budget`) |
+| `claude` | `workflow.js` sketch (`export async function run` + `agent` / `parallel` / `phase` / `budget`) |
+| `pi` | `workflow.js` for [pi-dynamic-workflows](https://pi.dev/packages/pi-dynamic-workflows) (`export const meta` + top-level `await`) |
 | `agentctl` | `task.md` + `run.yaml` + `rubric.md` (operator runs `agentctl` separately) |
 
 Always also writes `manifest.json`, `rationale.md`, and a copy of `analysis.json`. Mapping version: `suggest-map-v1`. See [`docs/suggest-workflow.md`](docs/suggest-workflow.md).
