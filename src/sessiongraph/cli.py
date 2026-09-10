@@ -9,6 +9,7 @@ from .analyze import analyze, compare
 from .parsers import discover_pi_sessions, load_session
 from .report import write_bundle
 from .retrieval import load_retrieval
+from .pipeline import load_pipeline
 from .suggest import default_out_dir, suggest_workflow
 
 
@@ -52,6 +53,9 @@ def _parser() -> argparse.ArgumentParser:
     retrieval_parser = sub.add_parser("analyze-retrieval", help="analyze saved standalone retrieval JSON offline")
     retrieval_parser.add_argument("session")
     retrieval_parser.add_argument("--out", default="sessiongraph-report")
+    pipeline_parser = sub.add_parser("analyze-pipeline", help="analyze declared stages and externally recorded checks")
+    pipeline_parser.add_argument("session")
+    pipeline_parser.add_argument("--out", default="sessiongraph-report")
     list_parser = sub.add_parser(
         "discover", aliases=["list-pi"], help="list local Pi session paths without reading content"
     )
@@ -92,9 +96,10 @@ def main(argv: list[str] | None = None) -> int:
             for path in discover_pi_sessions(args.root):
                 print(path)
             return 0
-        if args.command in {"analyze", "analyze-retrieval"}:
-            session = (load_retrieval(args.session) if args.command == "analyze-retrieval"
-                       else load_session(args.session))
+        if args.command in {"analyze", "analyze-retrieval", "analyze-pipeline"}:
+            loader = {"analyze": load_session, "analyze-retrieval": load_retrieval,
+                      "analyze-pipeline": load_pipeline}[args.command]
+            session = loader(args.session)
             result = analyze(session)
             destination = Path(args.out).resolve()
             write_bundle(session, result, destination, getattr(args, "include_content", False))

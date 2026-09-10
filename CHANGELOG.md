@@ -7,6 +7,10 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `analyze-pipeline`: ordered pipeline contracts with externally recorded artifact
+  checks, missing-check accounting, stage timeouts, content-free evidence hashes,
+  and contract-preserving `pipeline_contract` workflow suggestions. Pipeline
+  comparisons require matching fixture, verifier and contract hashes.
 - `sessiongraph suggest-workflow`: deterministic finding→topology compiler
   (`suggest-map-v1`) that emits markdown / Claude `workflow.js` / agentctl
   sketches from `analysis.json`, a report directory, or session JSONL. Stdlib

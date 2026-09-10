@@ -184,6 +184,14 @@ def analyze(session: Session) -> dict[str, Any]:
     findings = _repeated(events) + _alternating(events) + _quality(events)
     if session.format == "agentctl-loop-v1":
         findings += _agentctl_quality(events)
+    if session.format == "pipeline-v1" and not session.metadata["pipeline_success"]:
+        failures = [event.id for event in events if event.is_error]
+        findings.append(Finding(
+            "pipeline_contract", "critical", "Declared pipeline verification contract is not satisfied",
+            failures[:10] or ["result"],
+            "Inspect failed or missing stage/check evidence; repair the producer while keeping the fixture, "
+            "verifier and required checks fixed. A successful process exit is insufficient.",
+        ))
     if session.format == "retrieval-v1" and session.metadata.get("retrieval_escalation_deferred"):
         findings.append(Finding(
             "escalation_deferred", "warning", "Retrieval requires browser escalation",
@@ -211,7 +219,7 @@ def analyze(session: Session) -> dict[str, Any]:
             "events": len(events), "edges": sum(bool(event.parent_id) for event in events),
             "branches": len(branches), "tool_calls": sum(tool_counts.values()),
             "tool_counts": dict(tool_counts), "usage": dict(usage), "workflow_health": score,
-            **(session.metadata if session.format == "retrieval-v1" else {}),
+            **(session.metadata if session.format in {"retrieval-v1", "pipeline-v1"} else {}),
             **({
                 "loop_iterations": max((event.metadata.get("iteration", 0) for event in events), default=0),
                 "loop_retries": sum(
@@ -234,6 +242,15 @@ def analyze(session: Session) -> dict[str, Any]:
 
 def compare(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
     before_metrics, after_metrics = before["metrics"], after["metrics"]
+    pipeline = "pipeline-v1" in {before["session"]["format"], after["session"]["format"]}
+    if pipeline:
+        if before["session"]["format"] != after["session"]["format"]:
+            raise ValueError("pipeline comparison requires two pipeline-v1 analyses")
+        for field in ("fixture_sha256", "verifier_sha256", "contract_sha256"):
+            left = before["session"].get("metadata", {}).get(field)
+            right = after["session"].get("metadata", {}).get(field)
+            if not left or left != right:
+                raise ValueError(f"pipeline comparison requires matching {field}")
     keys = ["events", "tool_calls", "branches", "workflow_health"]
     keys.extend(
         key for key in ("loop_iterations", "loop_retries", "loop_duration_ms",
@@ -241,9 +258,17 @@ def compare(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
                         "retrieval_success", "retrieval_escalation_deferred")
         if key in before_metrics or key in after_metrics
     )
+    if pipeline:
+        keys.extend(("pipeline_checks_required", "pipeline_checks_passed", "pipeline_checks_failed",
+                     "pipeline_checks_missing", "pipeline_stages_completed", "pipeline_stages_missing",
+                     "pipeline_timeouts", "pipeline_duration_ms", "pipeline_success"))
     return {
         "schema_version": 1,
         "before": before["session"]["id"], "after": after["session"]["id"],
         "delta": {key: after_metrics.get(key, 0) - before_metrics.get(key, 0) for key in keys},
         "finding_delta": len(after.get("findings", [])) - len(before.get("findings", [])),
+        **({"comparable": True, "comparison_scope": "same fixture, verifier and declared contract; reported checks only",
+            "before_source_sha256": before["session"]["metadata"].get("source_sha256"),
+            "after_source_sha256": after["session"]["metadata"].get("source_sha256")}
+           if pipeline else {}),
     }
