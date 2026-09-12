@@ -26,5 +26,11 @@
   "engines": {
     "node": ">=24"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "pi": {
+    "extensions": [
+      "./extensions/pi/iseeagents-observer.ts",
+      "./packages/sessiongraph/pi-extension/sessiongraph.ts"
+    ]
+  }
 }
