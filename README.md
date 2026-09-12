@@ -23,6 +23,40 @@ events and source labels; it never imports your sessions or reads your instructi
 The default view is an activity timeline with event details. Switch to Provenance
 to inspect recorded relationships, missing observations, and request/response links.
 
+## Use in Pi
+
+Install the package and start a new Pi session (Node.js 24+):
+
+```sh
+pi install git:github.com/LifeTimeScriptKiddie/sessiongraph
+```
+
+The package loads the recorder and `/sessiongraph` command together. Recording
+starts for sessions where the package is enabled; complete a turn to populate a graph.
+Type `/sessiongraph` for a menu, or use:
+
+| Command | Result |
+|---|---|
+| `/sessiongraph open` | Build and open the current session's activity/provenance graph |
+| `/sessiongraph view` | Build HTML without launching a browser, useful over SSH |
+| `/sessiongraph report` | Analyze the saved Pi session and write a Markdown report |
+| `/sessiongraph status` | Check capture availability and Python analyzer setup |
+| `/sessiongraph help` | Show commands and privacy reminders |
+
+Graph viewing needs no Python. Reports require the Python analyzer; if it is
+missing, the command shows an exact `uv ... sync --frozen` setup command for the
+installed package. It recognizes that package's virtual environment automatically,
+or uses `sessiongraph` on PATH. Nothing installs Python dependencies automatically.
+
+Outputs are stored under `.sessiongraph/<session-file-stem>/`; captures are under
+`.iseeagents/`. Each graph uses only the current session's capture. Older sessions
+without a capture can still be analyzed with `report`. Reports analyze Pi's native
+log; the graph displays the recorder's context evidence. Both remain local and
+may contain private metadata. HTML omits raw text and local source-file reads.
+
+The package integration is tested against Pi 0.85.1. npm/catalog publication is
+separate from this Git installation route.
+
 ## Analyze a session
 
 Requires Python 3.11 or newer and [uv](https://docs.astral.sh/uv/).

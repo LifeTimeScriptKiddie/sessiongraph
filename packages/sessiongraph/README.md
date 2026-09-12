@@ -193,13 +193,20 @@ synthetic and proves integration compatibility, not a real policy speedup.
 
 ## Pi command
 
-After installing the CLI, copy or symlink `pi-extension/sessiongraph.ts` into `.pi/extensions/` in a trusted project. Restart Pi or use `/reload`, then:
+Install the complete Pi package so the command and recorder are available together:
 
-```text
-/sessiongraph .sessiongraph/current
+```sh
+pi install git:github.com/LifeTimeScriptKiddie/sessiongraph
 ```
 
-Pi extensions run with the user's full permissions. Review the extension before installing it. This one resolves the active persisted session and invokes the local `sessiongraph` executable.
+Start a new Pi session and use `/sessiongraph` for the menu. `/sessiongraph report`
+analyzes the active saved session; `/sessiongraph open` opens its recorded context
+graph without Python. `/sessiongraph status` shows backend setup instructions if
+needed. See the [workbench guide](../../README.md#use-in-pi).
+
+The extension depends on the workbench viewer sources; do not copy its single file
+out of the package. The Python CLI remains independently installable. Pi extensions
+run with the user's full permissions; captures and reports should remain private.
 
 ## Generic JSONL
 
