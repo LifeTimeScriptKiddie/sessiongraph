@@ -69,7 +69,7 @@ export default function sessionGraphExtension(pi: ExtensionAPI) {
               ? setupHelp() : `unavailable: ${error instanceof Error ? error.message : String(error)}`;
           }
           ctx.ui.notify([
-            `Current session: ${sessionFile ? "saved" : "not saved yet"}`,
+            `Current session: ${sessionFile && existsSync(sessionFile) ? "saved" : "not saved yet"}`,
             `Capture: ${hasCapture ? "ready" : "no recorded activity yet; complete a turn with this package enabled"}`,
             `Analyzer: ${analyzer}`,
             "Use /sessiongraph open for a graph or /sessiongraph report for analysis.",
