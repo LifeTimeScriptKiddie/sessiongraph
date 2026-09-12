@@ -1,0 +1,50 @@
+{
+  "id": "scenario-01",
+  "title": "Pi fixture: prompt, AGENTS.md, skill, partial read, tool result",
+  "sessionId": "fix-s01",
+  "steps": [
+    {
+      "type": "user_prompt",
+      "requestId": "r1",
+      "prompt": "Inspect the sample module and summarize."
+    },
+    {
+      "type": "context_file",
+      "requestId": "r1",
+      "path": "AGENTS.md",
+      "content": "# Agents\nUse fixtures only.\n"
+    },
+    {
+      "type": "skill",
+      "requestId": "r1",
+      "name": "sample-skill",
+      "content": "Read files carefully. Prefer partial ranges."
+    },
+    {
+      "type": "tool_result",
+      "requestId": "r1",
+      "toolCallId": "call_read_1",
+      "toolName": "read",
+      "content": "export function hello() { return 1 }\n",
+      "range": { "start": 0, "end": 36 }
+    },
+    {
+      "type": "provider_payload",
+      "requestId": "r1",
+      "final": true,
+      "payload": {
+        "messages": [
+          { "role": "system", "content": "# Agents\nUse fixtures only.\n" },
+          { "role": "user", "content": "Inspect the sample module and summarize." }
+        ]
+      }
+    },
+    {
+      "type": "usage",
+      "requestId": "r1",
+      "input": 420,
+      "output": 64,
+      "cached": 120
+    }
+  ]
+}

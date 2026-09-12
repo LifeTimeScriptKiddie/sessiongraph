@@ -1,0 +1,19 @@
+{
+  "id": "scenario-05",
+  "title": "Later payload-mutating extension: provisional vs final",
+  "sessionId": "fix-s05",
+  "steps": [
+    {
+      "type": "user_prompt",
+      "requestId": "r1",
+      "prompt": "check ordering"
+    },
+    {
+      "type": "provider_payload",
+      "requestId": "r1",
+      "provisional": true,
+      "mutatingExtensionAfter": true,
+      "payload": { "messages": [{ "role": "user", "content": "check ordering" }] }
+    }
+  ]
+}

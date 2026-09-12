@@ -1,0 +1,39 @@
+{
+  "findings": [
+    {
+      "code": "agent_timeout",
+      "evidence": [
+        "e-agent_timeout"
+      ],
+      "recommendation": "fix",
+      "severity": "critical",
+      "summary": "agent_timeout"
+    },
+    {
+      "code": "dangling_edges",
+      "evidence": [
+        "e-dangling_edges"
+      ],
+      "recommendation": "fix",
+      "severity": "info",
+      "summary": "dangling_edges"
+    }
+  ],
+  "graph": {
+    "edges": [],
+    "nodes": []
+  },
+  "metrics": {
+    "branches": 0,
+    "events": 10,
+    "tool_calls": 4,
+    "workflow_health": 55
+  },
+  "schema_version": 1,
+  "session": {
+    "format": "pi-v3",
+    "id": "matrix-timeout-dangling",
+    "metadata": {},
+    "source": "matrix-timeout-dangling.jsonl"
+  }
+}

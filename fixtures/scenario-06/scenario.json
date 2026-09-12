@@ -1,0 +1,38 @@
+{
+  "id": "scenario-06",
+  "title": "Dropped capture + retry: partial coverage, distinct attempts",
+  "sessionId": "fix-s06",
+  "steps": [
+    {
+      "type": "user_prompt",
+      "requestId": "r1",
+      "attemptId": "r1:a1",
+      "prompt": "first attempt"
+    },
+    {
+      "type": "drop",
+      "count": 1,
+      "boundary": "tool_result"
+    },
+    {
+      "type": "retry_attempt",
+      "requestId": "r1",
+      "attemptId": "r1:a2"
+    },
+    {
+      "type": "provider_payload",
+      "requestId": "r1",
+      "attemptId": "r1:a2",
+      "final": true,
+      "payload": { "messages": [{ "role": "user", "content": "first attempt" }] }
+    },
+    {
+      "type": "usage",
+      "requestId": "r1",
+      "attemptId": "r1:a2",
+      "input": null,
+      "output": null,
+      "cached": null
+    }
+  ]
+}

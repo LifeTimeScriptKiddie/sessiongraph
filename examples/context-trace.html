@@ -1,0 +1,195 @@
+<div id="context-trace-20260910">
+  <style>
+    #context-trace-20260910 {
+      color-scheme: light dark;
+      --ct-bg: light-dark(#ffffff, #171b22);
+      --ct-soft: light-dark(#f5f7fa, #202631);
+      --ct-fg: light-dark(#202b3a, #e5ebf4);
+      --ct-muted: light-dark(#58677a, #a9b5c7);
+      --ct-line: light-dark(#dce2eb, #374252);
+      --ct-included: light-dark(#087d69, #62d7bb);
+      --ct-included-bg: light-dark(#e0f4ed, #143d35);
+      --ct-read: light-dark(#95600b, #f5c46d);
+      --ct-read-bg: light-dark(#fff1d9, #42331a);
+      --ct-summary: light-dark(#7250b3, #c2a6f4);
+      --ct-summary-bg: light-dark(#f0eafa, #342748);
+      --ct-active: light-dark(#174fb2, #91b8ff);
+      --ct-active-bg: light-dark(#e8effc, #223754);
+      --ct-user: light-dark(#668bdd, #7a9de9);
+      --ct-instructions: light-dark(#549884, #75bca6);
+      --ct-material: light-dark(#ac8ad2, #b39bd5);
+      --ct-history: light-dark(#d5aa69, #d5b77f);
+      --ct-unknown: light-dark(#bec7d3, #758295);
+      background: var(--ct-bg); color: var(--ct-fg); border: 1px solid var(--ct-line);
+      border-radius: 12px; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: clip; width: 100%; box-sizing: border-box;
+    }
+    #context-trace-20260910 * { box-sizing: border-box; }
+    #context-trace-20260910 .ct-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 17px 18px 12px; }
+    #context-trace-20260910 .ct-name { font-size: 19px; font-weight: 500; }
+    #context-trace-20260910 .ct-demo { color: var(--ct-muted); margin-left: auto; font-size: 12px; }
+    #context-trace-20260910 .ct-subtitle { color: var(--ct-muted); padding: 0 18px 14px; font-size: 12px; }
+    #context-trace-20260910 .ct-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; border-top: 1px solid var(--ct-line); padding: 11px 18px; font-size: 12px; }
+    #context-trace-20260910 .ct-key { display: inline-flex; align-items: center; gap: 5px; }
+    #context-trace-20260910 .ct-dot { width: 8px; height: 8px; border-radius: 2px; background: var(--ct-included); }
+    #context-trace-20260910 .ct-dot.read { background: var(--ct-read); }
+    #context-trace-20260910 .ct-dot.summary { background: var(--ct-summary); }
+    #context-trace-20260910 .ct-dot.unknown { background: var(--ct-unknown); }
+    #context-trace-20260910 table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0; }
+    #context-trace-20260910 th, #context-trace-20260910 td { padding: 5px 7px; border-bottom: 1px solid var(--ct-line); text-align: center; font-weight: 400; }
+    #context-trace-20260910 th:first-child { width: 34%; text-align: left; padding-left: 18px; }
+    #context-trace-20260910 thead { background: var(--ct-soft); }
+    #context-trace-20260910 thead th { padding-top: 8px; padding-bottom: 8px; }
+    #context-trace-20260910 .ct-source { font-weight: 500; overflow-wrap: anywhere; font-size: 12px; }
+    #context-trace-20260910 .ct-path { display: block; color: var(--ct-muted); font-size: 11px; overflow-wrap: anywhere; }
+    #context-trace-20260910 button { font: inherit; cursor: pointer; border: 1px solid transparent; border-radius: 5px; padding: 6px 4px; width: 100%; background: transparent; color: var(--ct-fg); }
+    #context-trace-20260910 button:hover { border-color: var(--ct-muted); }
+    #context-trace-20260910 .ct-request { font-size: 12px; font-weight: 500; }
+    #context-trace-20260910 .ct-request small { display: block; font-size: 11px; font-weight: 400; color: var(--ct-muted); }
+    #context-trace-20260910 .ct-request[aria-pressed="true"] { color: var(--ct-active); background: var(--ct-active-bg); }
+    #context-trace-20260910 .ct-cell { min-height: 31px; font-size: 12px; font-variant-numeric: tabular-nums; }
+    #context-trace-20260910 .ct-cell.included { background: var(--ct-included-bg); color: var(--ct-included); }
+    #context-trace-20260910 .ct-cell.read { background: var(--ct-read-bg); color: var(--ct-read); }
+    #context-trace-20260910 .ct-cell.summary { background: var(--ct-summary-bg); color: var(--ct-summary); }
+    #context-trace-20260910 .ct-cell.loaded { background: var(--ct-soft); color: var(--ct-muted); }
+    #context-trace-20260910 .ct-cell.unknown { color: var(--ct-muted); }
+    #context-trace-20260910 .ct-cell[aria-pressed="true"] { border-color: var(--ct-active); box-shadow: inset 0 0 0 1px var(--ct-active); }
+    #context-trace-20260910 .ct-detail { padding: 15px 18px; }
+    #context-trace-20260910 .ct-detail-head { display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: space-between; margin-bottom: 8px; }
+    #context-trace-20260910 .ct-detail-title { font-weight: 500; }
+    #context-trace-20260910 .ct-cache { color: var(--ct-muted); font-size: 12px; }
+    #context-trace-20260910 .ct-stack { display: flex; width: 100%; height: 15px; overflow: hidden; gap: 2px; margin: 9px 0; }
+    #context-trace-20260910 .ct-segment { height: 15px; }
+    #context-trace-20260910 .ct-breakdown { display: flex; flex-wrap: wrap; gap: 4px 13px; color: var(--ct-muted); font-size: 11px; }
+    #context-trace-20260910 .ct-breakdown span { display: inline-flex; align-items: center; gap: 5px; }
+    #context-trace-20260910 .ct-breakdown i { display: inline-block; width: 7px; height: 7px; border-radius: 1px; }
+    #context-trace-20260910 .ct-evidence { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--ct-line); }
+    #context-trace-20260910 .ct-evidence-path { overflow-wrap: anywhere; font-weight: 500; font-size: 12px; }
+    #context-trace-20260910 .ct-evidence-status { color: var(--ct-muted); font-size: 12px; margin-top: 4px; }
+    #context-trace-20260910 .ct-footer { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 9px 18px; background: var(--ct-soft); color: var(--ct-muted); font-size: 11px; }
+    @media (max-width: 480px) {
+      #context-trace-20260910 .ct-header, #context-trace-20260910 .ct-detail { padding: 12px 10px; }
+      #context-trace-20260910 .ct-subtitle, #context-trace-20260910 .ct-legend, #context-trace-20260910 .ct-footer { padding-left: 10px; padding-right: 10px; }
+      #context-trace-20260910 th:first-child { width: 36%; padding-left: 10px; }
+      #context-trace-20260910 th, #context-trace-20260910 td { padding: 5px 2px; }
+      #context-trace-20260910 .ct-path { display: none; }
+      #context-trace-20260910 .ct-request small { display: none; }
+      #context-trace-20260910 .ct-cell { font-size: 11px; padding: 6px 1px; }
+      #context-trace-20260910 .ct-demo { margin-left: 0; }
+    }
+  </style>
+  <div class="ct-header"><span class="ct-name">Context trace</span><span class="ct-demo">Synthetic example · not live</span></div>
+  <div class="ct-subtitle">Pi fixture session · source × model request · select a cell · coverage grades remain visible</div>
+  <div class="ct-legend" aria-label="Evidence legend">
+    <span class="ct-key"><i class="ct-dot"></i>In request snapshot</span>
+    <span class="ct-key"><i class="ct-dot read"></i>Read observed</span>
+    <span class="ct-key"><i class="ct-dot summary"></i>Summary ancestor</span>
+    <span class="ct-key"><i class="ct-dot unknown"></i>Not observed / runtime only</span>
+  </div>
+  <table aria-label="Synthetic source inclusion by model request">
+    <thead><tr><th scope="col">Text source</th><th scope="col"><button class="ct-request" data-request="0" type="button" aria-pressed="false">R1<small>Plan</small></button></th><th scope="col"><button class="ct-request" data-request="1" type="button" aria-pressed="false">R2<small>Inspect</small></button></th><th scope="col"><button class="ct-request" data-request="2" type="button" aria-pressed="true">R3<small>Change</small></button></th><th scope="col"><button class="ct-request" data-request="3" type="button" aria-pressed="false">R4<small>Resume</small></button></th></tr></thead>
+    <tbody id="ct-source-rows"></tbody>
+  </table>
+  <div class="ct-detail" aria-live="polite">
+    <div class="ct-detail-head"><span class="ct-detail-title" id="ct-request-total"></span><span class="ct-cache" id="ct-request-cache"></span></div>
+    <div class="ct-cache">Source contribution estimates · ≈ tokens</div>
+    <div class="ct-stack" id="ct-composition" role="img" aria-label="Estimated request composition"></div>
+    <div class="ct-breakdown" id="ct-breakdown"></div>
+    <div class="ct-evidence"><div class="ct-evidence-path" id="ct-evidence-source"></div><div class="ct-evidence-status" id="ct-evidence-chain"></div></div>
+  </div>
+  <div class="ct-footer"><span>Blank cells mean no observation</span><span>Reads occur after the labeled request</span><span>Cached tokens are a subset of input</span><span>Provider totals ≠ source estimates · discrepancy stays unattributed</span><span>Inventory / runtime-only ≠ request inclusion</span></div>
+  <script>
+    (() => {
+      const root = document.getElementById('context-trace-20260910');
+      const sources = [
+        {name:'Your input',path:'user message · u1',type:'user',states:[320,320,320,'summary']},
+        {name:'AGENTS.md',path:'workspace instructions',type:'instructions',states:[1900,1900,1900,1900]},
+        {name:'reviewer.md',path:'.pi/profiles/ · example',type:'instructions',states:[600,600,600,600]},
+        {name:'SKILL.md',path:'skillz/development/debugging/',type:'material',states:[null,'read',800,'summary']},
+        {name:'initializer.py',path:'project source · version a1',type:'material',states:[null,'read',2200,'summary']},
+        {name:'Tool definitions',path:'runtime-generated schemas',type:'material',states:[900,900,900,900]},
+        {name:'Conversation',path:'assistant / tool history',type:'history',states:[null,1200,1400,'summary']},
+        {name:'Summary S1',path:'session compaction',type:'history',states:[null,null,null,700]},
+        {name:'trace.ts',path:'.pi/extensions/',type:'runtime',states:['loaded',null,null,null]},
+        {name:'CLAUDE.md',path:'.claude/ · inventory only',type:'inventory',states:[null,null,null,null]},
+        {name:'config.toml',path:'.codex/ · inventory only',type:'inventory',states:[null,null,null,null]}
+      ];
+      const requests = [
+        {total:4800,cached:1900}, {total:6200,cached:1900},
+        {total:9200,cached:2200}, {total:5400,cached:1900}
+      ];
+      const categories = [
+        {key:'user',label:'Your input',color:'var(--ct-user)'},
+        {key:'instructions',label:'Instructions',color:'var(--ct-instructions)'},
+        {key:'material',label:'Skills / tools / files',color:'var(--ct-material)'},
+        {key:'history',label:'History / summary',color:'var(--ct-history)'},
+        {key:'unknown',label:'Unattributed balance',color:'var(--ct-unknown)'}
+      ];
+      let selectedRequest = 2;
+      let selectedSource = 3;
+      const rows = root.querySelector('#ct-source-rows');
+      const fmt = n => n.toLocaleString('en-US');
+      const compact = n => n >= 1000 ? (n/1000).toFixed(1)+'k' : String(n);
+      const status = value => typeof value === 'number' ? 'included' : value || 'unknown';
+      sources.forEach((source, sourceIndex) => {
+        const row = document.createElement('tr');
+        const heading = document.createElement('th'); heading.scope = 'row';
+        const name = document.createElement('span'); name.className = 'ct-source'; name.textContent = source.name;
+        const path = document.createElement('span'); path.className = 'ct-path'; path.textContent = source.path;
+        heading.append(name,path); row.append(heading);
+        source.states.forEach((value, requestIndex) => {
+          const cell = document.createElement('td');
+          const button = document.createElement('button'); button.type = 'button';
+          button.className = 'ct-cell '+status(value);
+          button.dataset.source = String(sourceIndex); button.dataset.request = String(requestIndex);
+          const label = typeof value === 'number' ? '≈'+compact(value) : ({read:'Read',summary:'↪ S1',loaded:'Loaded'})[value] || '—';
+          button.textContent = label;
+          button.setAttribute('aria-label',source.name+', '+source.path+', request '+(requestIndex+1)+': '+(value===null?'not observed':label));
+          button.setAttribute('aria-pressed','false');
+          button.addEventListener('click',() => { selectedSource=sourceIndex;selectedRequest=requestIndex;draw(); });
+          cell.append(button); row.append(cell);
+        });
+        rows.append(row);
+      });
+      root.querySelectorAll('.ct-request').forEach(button => button.addEventListener('click',() => {selectedRequest=Number(button.dataset.request);draw();}));
+      function draw() {
+        const request = requests[selectedRequest];
+        const selected = sources[selectedSource]; const value = selected.states[selectedRequest];
+        root.querySelectorAll('.ct-request').forEach(button => button.setAttribute('aria-pressed',String(Number(button.dataset.request)===selectedRequest)));
+        root.querySelectorAll('.ct-cell').forEach(button => button.setAttribute('aria-pressed',String(Number(button.dataset.source)===selectedSource && Number(button.dataset.request)===selectedRequest)));
+        root.querySelector('#ct-request-total').textContent = 'R'+(selectedRequest+1)+' · '+fmt(request.total)+' reported input tokens';
+        root.querySelector('#ct-request-cache').textContent = fmt(request.cached)+' cached';
+        const counts = {user:0,instructions:0,material:0,history:0,unknown:0};
+        sources.forEach(source => {const n=source.states[selectedRequest];if(typeof n==='number')counts[source.type]+=n;});
+        counts.unknown = request.total - counts.user-counts.instructions-counts.material-counts.history;
+        const bar=root.querySelector('#ct-composition');const legend=root.querySelector('#ct-breakdown');bar.replaceChildren();legend.replaceChildren();
+        const descriptions=[];
+        categories.forEach(category => {
+          const amount=counts[category.key];if(!amount)return;
+          const segment=document.createElement('span');segment.className='ct-segment';segment.style.width=String(amount/request.total*100)+'%';segment.style.background=category.color;bar.append(segment);
+          const item=document.createElement('span');const swatch=document.createElement('i');swatch.style.background=category.color;
+          item.append(swatch,document.createTextNode(category.label+' ≈'+fmt(amount)));legend.append(item);
+          descriptions.push(category.label+': approximately '+fmt(amount)+' tokens');
+        });
+        bar.setAttribute('aria-label',descriptions.join('; '));
+        root.querySelector('#ct-evidence-source').textContent=selected.name+' · '+selected.path;
+        let evidence;
+        if(typeof value==='number'){
+          evidence='Snapshot inclusion observed at R'+(selectedRequest+1)+' · contribution ≈'+fmt(value)+' tokens; token attribution is estimated.';
+          if(selectedSource===3 || selectedSource===4) evidence='Read result after R2 → source version a1 → matching span in R3 payload snapshot · ≈'+fmt(value)+' tokens.';
+          if(selectedSource===7) evidence='Earlier history → compaction S1 → R4 payload snapshot · original sources are ancestry, not extra tokens.';
+        } else if(value==='read') evidence='Tool returned source text after R2. No inclusion is established until a later request snapshot matches it.';
+        else if(value==='summary') evidence='Summary S1 records this source as an ancestor. Original text is not counted again in R4.';
+        else if(value==='loaded') evidence='Extension executed in the runtime. Its source code is not confirmed in any model request. Coverage: runtime_loaded only.';
+        else evidence='No read or request-inclusion observation in this fixture. Coverage unknown — not proof the source was ignored.';
+        if(typeof value==='number'){
+          const attributed=counts.user+counts.instructions+counts.material+counts.history;
+          const discrepancy=request.total-attributed;
+          evidence+=' Provider totals vs estimates discrepancy ≈'+fmt(discrepancy)+' (unattributed).';
+        }
+        root.querySelector('#ct-evidence-chain').textContent=evidence;
+      }
+      draw();
+    })();
+  </script>
+</div>

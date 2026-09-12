@@ -1,0 +1,40 @@
+{
+  "mapping_version": "suggest-map-v1",
+  "cases": [
+    {
+      "id": "multi_fault_contract_dead_end_retry",
+      "analysis": "multi_fault_contract_dead_end_retry/analysis.json",
+      "expected": "multi_fault_contract_dead_end_retry/expected_topology.json",
+      "include_healthy": false,
+      "notes": "multi-fault / pair / empty coverage for suggest-map-v1"
+    },
+    {
+      "id": "errors_plus_repeated",
+      "analysis": "errors_plus_repeated/analysis.json",
+      "expected": "errors_plus_repeated/expected_topology.json",
+      "include_healthy": false,
+      "notes": "multi-fault / pair / empty coverage for suggest-map-v1"
+    },
+    {
+      "id": "timeout_plus_dangling",
+      "analysis": "timeout_plus_dangling/analysis.json",
+      "expected": "timeout_plus_dangling/expected_topology.json",
+      "include_healthy": false,
+      "notes": "multi-fault / pair / empty coverage for suggest-map-v1"
+    },
+    {
+      "id": "alternating_plus_correction",
+      "analysis": "alternating_plus_correction/analysis.json",
+      "expected": "alternating_plus_correction/expected_topology.json",
+      "include_healthy": false,
+      "notes": "multi-fault / pair / empty coverage for suggest-map-v1"
+    },
+    {
+      "id": "healthy_empty",
+      "analysis": "healthy_empty/analysis.json",
+      "expected": "healthy_empty/expected_topology.json",
+      "include_healthy": false,
+      "notes": "multi-fault / pair / empty coverage for suggest-map-v1"
+    }
+  ]
+}

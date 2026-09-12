@@ -1,200 +1,100 @@
 # SessionGraph
 
-SessionGraph is a local-first analyzer for coding-agent sessions. It reads Pi v3 session JSONL, agentctl improvement-loop traces, or a small generic JSONL format; builds an interaction graph; detects repeated/alternating loops, agent timeouts, and dead ends; and produces an evidence-backed Markdown report. It never calls a model or network service.
+A local-first workbench for inspecting coding-agent sessions: activity timelines,
+recorded context provenance, and workflow graph analysis in one repository.
 
-**Scope.** SessionGraph is a triage tool for *session and loop health*: it ranks recorded sessions by workflow health and surfaces repeated-action loops, dead ends, unrecovered errors, agent timeouts, and user-correction turns, so you can find the sessions worth investigating. It is **not** an agent-quality, routing, or answer-correctness evaluator — it observes what happened in a session, not whether the agent chose the right tool, model, or answer.
+The Python SessionGraph analyzer and TypeScript iseeagents recorder/viewer are
+included together. The event format keeps its `iseeagents.context.v1` name for
+compatibility. No OpenSession code or service is included.
 
-The default output omits transcript and tool-argument content. Findings reference event IDs and stable, redacted fingerprints. Content is included only with an explicit `--include-content` flag and is still passed through secret and PII redaction.
+## Try the synthetic demo
 
-## Quick start
+Requires Node.js 24 or newer. The recorder and viewer use Node's built-in modules;
+no npm dependency installation or account is needed.
 
-```bash
+```sh
+git clone https://github.com/LifeTimeScriptKiddie/sessiongraph.git
 cd sessiongraph
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install -e .
-sessiongraph analyze tests/fixtures/pi-loop.jsonl --out sessiongraph-report
-open sessiongraph-report/report.md
+npm run demo
 ```
 
-Find locally stored Pi sessions without reading their contents:
+Open `.sessiongraph/demo/provenance.html` in a browser. The demo uses invented
+events and source labels; it never imports your sessions or reads your instructions.
+The default view is an activity timeline with event details. Switch to Provenance
+to inspect recorded relationships, missing observations, and request/response links.
 
-```bash
-sessiongraph discover
+## Analyze a session
+
+Requires Python 3.11 or newer and [uv](https://docs.astral.sh/uv/).
+
+```sh
+uv --directory packages/sessiongraph sync --extra graph --frozen
+uv --directory packages/sessiongraph run --frozen sessiongraph analyze tests/fixtures/pi-loop.jsonl --out .sessiongraph/example
 ```
 
-Analyze one explicitly selected session:
+The example report is written under `packages/sessiongraph/.sessiongraph/example/`.
+For a selected real session, pass its absolute path instead of the fixture.
+The analyzer is also independently installable from `packages/sessiongraph/`.
+See the [analyzer guide](packages/sessiongraph/README.md) for comparison,
+scorecards, graph metrics, pipeline verification, and optional visualization.
 
-```bash
-sessiongraph analyze ~/.pi/agent/sessions/<project>/<session>.jsonl --out .sessiongraph/baseline
+## Capture and inspect provenance
+
+```sh
+# Select an existing Codex rollout explicitly. Output paths must be fresh.
+npm run ingest:codex -- /path/to/rollout.jsonl --out .iseeagents/capture.jsonl
+npm run export:sessiongraph -- .iseeagents/capture.jsonl --out .iseeagents/analysis-input.jsonl
+npm run graph -- .iseeagents/capture.jsonl --out .iseeagents/view.html
 ```
 
-The outputs are:
+Pi and Claude adapters are also included. They are opt-in and have different
+observation coverage. See [adapter boundaries](docs/adapter-boundaries.md) and
+[the inspector guide](docs/provenance-inspector.md). No hooks, background service,
+broker connections, or model calls are installed by cloning or running the demo.
 
-- `analysis.json`: metrics, content-free graph, findings, and sanitized event records;
-- `report.md`: human-readable evidence and recommendations;
-- `graph.mmd`: a Mermaid interaction graph.
+## Privacy and evidence boundaries
 
-## Closed improvement loop
+- This repository contains source code and synthetic fixtures, not real session captures.
+- Runtime captures and derived databases are ignored by Git. They may still contain
+  private metadata; do not share a whole working folder or `.git` directory.
+- HTML generation defaults to no raw text, no source-file reads, and no explicit
+  source paths. Source aliases that are absolute paths are reduced to filenames.
+  Other metadata and custom labels are not guaranteed anonymous.
+- `npm run graph -- ... --include-source-text` explicitly permits embedding recorded
+  text and reading referenced local instruction/skill files. Treat that HTML as private.
+- Files read during rendering show their current contents, not proof of what the
+  agent saw earlier. A recorded match or graph edge does not establish model attention.
+- Capture gaps, absent responses, and unknown usage remain visible rather than inferred.
 
-SessionGraph separates observation from causal evaluation:
+Read [PRIVACY.md](PRIVACY.md) before exporting real sessions.
 
-```text
-session -> deterministic findings -> suggest-workflow (optional)
-        -> human / Claude Workflow / pi-dynamic-workflows / agentctl applies sketch
-        -> comparable candidate sessions -> before/after comparison -> keep or roll back
+## Repository layout
+
+| Path | Purpose |
+|---|---|
+| `src/`, `extensions/` | iseeagents recorder, adapters, activity and provenance viewer |
+| `packages/sessiongraph/` | Independently packaged Python analyzer |
+| `contracts/` | Versioned analysis and experiment interfaces |
+| `tests/`, `fixtures/` | Synthetic recorder/viewer acceptance checks |
+| `examples/provenance.html` | Prebuilt synthetic viewer demo |
+
+## Development checks
+
+```sh
+npm test
+npm run check:public
+uv --directory packages/sessiongraph run --extra dev --frozen python -m unittest discover -s tests -q
+npm run test:integration
+uv --directory packages/sessiongraph run --extra dev --frozen python -m build --no-isolation
 ```
 
-Analyze baseline and candidate sessions, then compare them:
+The lockfile retains existing runtime dependency versions and adds a pinned
+`setuptools==80.9.0` build backend. That release predates the 14-day resolution
+cooldown; the build-tool refresh used a fixed 2026-08-28 UTC cutoff. The public-source guard checks tracked file names and common private
+metadata patterns; it is not a complete secret detector. Release review also uses
+a credential scan and inspects synthetic artifacts.
 
-```bash
-sessiongraph analyze baseline.jsonl --out .sessiongraph/baseline
-sessiongraph analyze candidate.jsonl --out .sessiongraph/candidate
-sessiongraph compare .sessiongraph/baseline/analysis.json .sessiongraph/candidate/analysis.json
-```
+## License
 
-Emit a **suggested dynamic workflow** from findings (stdlib-only; never auto-runs agents):
-
-```bash
-sessiongraph suggest-workflow .sessiongraph/baseline/analysis.json --target markdown --out .sessiongraph/suggest-md
-sessiongraph suggest-workflow .sessiongraph/baseline --target claude --out .sessiongraph/suggest-claude
-sessiongraph suggest-workflow .sessiongraph/baseline --target pi --out .sessiongraph/suggest-pi
-sessiongraph suggest-workflow .sessiongraph/baseline --target agentctl --out .sessiongraph/suggest-agentctl
-```
-
-| `--target` | Primary artifacts |
-|------------|-------------------|
-| `markdown` | `workflow.md` DAG + experiment |
-| `claude` | `workflow.js` sketch (`export async function run` + `agent` / `parallel` / `phase` / `budget`) |
-| `pi` | `workflow.js` for [pi-dynamic-workflows](https://pi.dev/packages/pi-dynamic-workflows) (`export const meta` + top-level `await`) |
-| `agentctl` | `task.md` + `run.yaml` + `rubric.md` (operator runs `agentctl` separately) |
-
-Always also writes `manifest.json`, `rationale.md`, and a copy of `analysis.json`. Mapping version: `suggest-map-v1`. See [`docs/suggest-workflow.md`](docs/suggest-workflow.md).
-
-For a generic critique-and-revision loop (less topology-aware), `prepare-loop` remains available:
-
-```bash
-sessiongraph prepare-loop .sessiongraph/baseline/report.md --out .sessiongraph/agentctl-loop
-agentctl run .sessiongraph/agentctl-loop
-```
-
-Analyze the resulting control loop itself:
-
-```bash
-sessiongraph analyze .sessiongraph/agentctl-loop/trace.jsonl --out .sessiongraph/agentctl-loop-analysis
-```
-
-Agentctl traces are recognized from their lifecycle events. SessionGraph reconstructs the
-unrolled `generate → validate → evaluate → decision → retry/finish` graph and reports loop
-iterations, retry count, final status, stage duration, bottlenecks, failed stages, and timeouts
-without copying prompts or candidate text.
-
-`agentctl run` mutates its checkpoint and creates candidate/evaluation artifacts. The generated task embeds only the content-free report, not the source transcript. `loop-run/` contains the human-readable configuration and rubric used by `prepare-loop`. Prefer `suggest-workflow --target agentctl` when you want finding→topology budgets instead of a generic improvement prompt.
-
-## Pipeline verification records
-
-Use `analyze-pipeline` for an actual ordered pipeline whose external verifier records
-stage outcomes and artifact checks. It separates **process completion** from
-**reported contract satisfaction**; missing required checks never count as passes.
-
-```bash
-sessiongraph analyze-pipeline baseline/pipeline.json --out baseline/analysis
-sessiongraph analyze-pipeline candidate/pipeline.json --out candidate/analysis
-sessiongraph compare baseline/analysis/analysis.json candidate/analysis/analysis.json
-sessiongraph suggest-workflow baseline/analysis --target agentctl --out proposed-repair
-```
-
-The JSON format is `schema: "sessiongraph.pipeline.v1"` with:
-
-- `fixture_sha256`, `verifier_sha256`: lowercase SHA256 hashes identifying the
-  fixed input and check implementation; optional `source_sha256` identifies the producer revision.
-- `required_stages`: nonempty ordered array of unique stage IDs.
-- `required_checks`: nonempty object mapping each required check ID to its stage ID.
-- `stages`: recorded stages in declared order, each with `id`, `status`
-  (`completed`, `failed`, `blocked`, `timeout`), finite nonnegative `duration_ms`,
-  and `checks`: objects containing `id`, boolean `passed`, and `evidence_sha256`.
-
-The adapter exports ordinal stage/check IDs and evidence hashes, not commands,
-targets, stage names or artifact contents. It does not read referenced evidence,
-run checks, or certify a verifier's claims. Metrics cover required/passed/failed/missing
-checks, completed/missing stages, timeouts and summed stage duration. Successful
-verification requires every declared stage completed and every required check passed.
-Failed verification produces a `pipeline_contract` finding and a contract-preserving
-workflow suggestion. Suggestions never run automatically.
-
-Pipeline comparison rejects different fixture, verifier or declared-contract hashes,
-and rejects mixing pipeline records with wrapper/session formats. The producer revision
-may change. Matching hashes establish comparable recorded checks, not a statistically
-proven causal improvement; runtime is recorded stage time, not total wall-clock time.
-
-## CodeCollector retrieval reports
-
-Analyze saved JSON from `insane_research_standalone/standalone_fetch.py`:
-
-```bash
-sessiongraph analyze-retrieval baseline-fetch.json --out baseline-analysis
-sessiongraph analyze-retrieval candidate-fetch.json --out candidate-analysis
-sessiongraph compare baseline-analysis/analysis.json candidate-analysis/analysis.json
-```
-
-This offline adapter reads the producer's pretty-printed JSON directly. It records
-attempt order, unsuccessful attempts, elapsed seconds, final success, and deferred
-browser escalation. It excludes URLs, content, headers, and error text. Both
-`strong_ok` and `weak_ok` count as successful attempts, matching the producer.
-Non-successful attempts followed by a successful retrieval are retained as metrics,
-without marking the whole retrieval as failed.
-
-Compare the same sources and success requirements across real runs before changing
-retrieval policy. Fewer attempts alone does not establish better retrieval quality.
-SessionGraph supplies observation and comparison; it does not execute or tune the
-retrieval engine automatically.
-
-Offline verification with the sibling CodeCollector producer installed locally:
-
-```bash
-PYTHONPATH=src python3 tests/replay_codecollector_retrieval.py
-PYTHONPATH=src python3 tests/benchmark_export.py
-```
-
-The replay uses actual producer classes with a mocked fetch; its candidate is
-synthetic and proves integration compatibility, not a real policy speedup.
-
-## Pi command
-
-After installing the CLI, copy or symlink `pi-extension/sessiongraph.ts` into `.pi/extensions/` in a trusted project. Restart Pi or use `/reload`, then:
-
-```text
-/sessiongraph .sessiongraph/current
-```
-
-Pi extensions run with the user's full permissions. Review the extension before installing it. This one resolves the active persisted session and invokes the local `sessiongraph` executable.
-
-## Generic JSONL
-
-Each line is an event object. Supported fields include `id`, `parent_id`, `type` or `kind`, `role`, `name` / `tool_name`, `content` / `text`, `arguments`, `timestamp`, `is_error`, and `usage`. Missing IDs and parent links are filled as a linear trace.
-
-```json
-{"id":"1","role":"user","content":"Fix the test"}
-{"id":"2","parent_id":"1","type":"tool_call","name":"test","arguments":{"suite":"unit"}}
-{"id":"3","parent_id":"2","type":"tool_result","name":"test","is_error":true,"content":"failed"}
-```
-
-## Detector semantics
-
-- `repeated_action`: the same canonical tool name and arguments appears three times inside eight tool calls, at least two attempts fail, and none records recovery;
-- `alternating_loop`: tool signatures form A-B-A-B with at least two failed results;
-- `errors`: unrecovered errored tool results or aborted messages occurred — an errored tool call whose same signature succeeds later in the session is treated as recovered and excluded, so the count reflects failures the run never got past;
-- `user_correction`: a user turn contains an English correction phrase;
-- `dead_end`: the final recorded event is errored or aborted;
-- `dangling_edges`: a parent referenced by the selected branch is absent.
-
-These are review signals, not diagnoses of model intent. `workflow_health` is a deterministic triage score, not a quality benchmark.
-
-## Development
-
-```bash
-PYTHONPATH=src python -m unittest discover -s tests -v
-PYTHONPATH=src python -m compileall -q src tests
-```
-
-See [RESEARCH.md](RESEARCH.md) for similar projects, design boundaries, and sources.
+MIT. See [LICENSE](LICENSE). Public project attribution is retained. The combined
+workbench is a cleaned source snapshot; private development history is not included.

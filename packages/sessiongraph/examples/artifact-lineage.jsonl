@@ -1,0 +1,8 @@
+{"id":"request","kind":"user_request","role":"user","parent_ids":[]}
+{"id":"system","kind":"system_input","parent_ids":[]}
+{"id":"agent-run","kind":"agent_run","parent_ids":["request","system"],"parent_relations":{"request":"requested","system":"included_in"}}
+{"id":"source-file","kind":"artifact","name":"source.py@before","parent_ids":[]}
+{"id":"code-version","kind":"artifact","name":"source.py@after","parent_ids":["agent-run","source-file"],"parent_relations":{"agent-run":"modified","source-file":"superseded_by"}}
+{"id":"test-run","kind":"test_run","name":"unit tests","parent_ids":["code-version"],"parent_relations":{"code-version":"verified_by"}}
+{"id":"review","kind":"review","name":"code review","parent_ids":["code-version","test-run"],"parent_relations":{"code-version":"reviewed_by","test-run":"included_in"}}
+{"id":"response","kind":"final_response","role":"assistant","parent_ids":["review"],"parent_relations":{"review":"supports"}}

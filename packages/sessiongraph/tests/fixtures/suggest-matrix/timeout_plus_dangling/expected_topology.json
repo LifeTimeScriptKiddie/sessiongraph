@@ -1,0 +1,29 @@
+{
+  "findings_used": [
+    "agent_timeout",
+    "dangling_edges"
+  ],
+  "flags": {
+    "checkpoint": false,
+    "classify": false,
+    "dangling": true,
+    "escalation": false,
+    "fallback": true,
+    "fast": false,
+    "handoff": false,
+    "preflight": false,
+    "retry": false
+  },
+  "guard_codes": [
+    "dangling_edges"
+  ],
+  "mapping_version": "suggest-map-v1",
+  "markdown_graph": "Start \u2192 ParallelWork \u2192 FallbackAdapter \u2192 Verify \u2192 Done",
+  "pi_meta_name": "sg_agent_timeout_repair",
+  "pi_phases": [
+    "parallel-work",
+    "fallback"
+  ],
+  "primary_finding": "agent_timeout",
+  "skipped": false
+}

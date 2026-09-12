@@ -1,0 +1,30 @@
+{
+  "findings_used": [
+    "alternating_loop",
+    "user_correction"
+  ],
+  "flags": {
+    "checkpoint": true,
+    "classify": false,
+    "dangling": false,
+    "escalation": false,
+    "fallback": false,
+    "fast": false,
+    "handoff": false,
+    "preflight": true,
+    "retry": false
+  },
+  "guard_codes": [
+    "user_correction"
+  ],
+  "mapping_version": "suggest-map-v1",
+  "markdown_graph": "PreflightChecklist \u2192 Start \u2192 Act \u2192 Summarize \u2192 PickStrategy \u2192 Verify \u2192 Done",
+  "pi_meta_name": "sg_alternating_loop_repair",
+  "pi_phases": [
+    "preflight",
+    "checkpoint",
+    "strategy-fork"
+  ],
+  "primary_finding": "alternating_loop",
+  "skipped": false
+}

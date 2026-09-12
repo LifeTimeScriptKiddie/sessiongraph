@@ -1,0 +1,32 @@
+{
+  "id": "scenario-08",
+  "title": "Recorder does not mutate payload; secret-like strings not persisted",
+  "sessionId": "fix-s08",
+  "steps": [
+    {
+      "type": "user_prompt",
+      "requestId": "r1",
+      "prompt": "use key sk-SYNTHETICNOTAREALKEY000000"
+    },
+    {
+      "type": "tool_result",
+      "requestId": "r1",
+      "toolCallId": "t1",
+      "toolName": "bash",
+      "content": "api_key=supersecret_value_123456\n-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\n"
+    },
+    {
+      "type": "provider_payload",
+      "requestId": "r1",
+      "final": true,
+      "payload": {
+        "messages": [
+          {
+            "role": "user",
+            "content": "use key sk-SYNTHETICNOTAREALKEY000000"
+          }
+        ]
+      }
+    }
+  ]
+}

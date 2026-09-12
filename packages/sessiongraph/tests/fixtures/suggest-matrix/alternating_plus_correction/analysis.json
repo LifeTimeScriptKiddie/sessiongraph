@@ -1,0 +1,39 @@
+{
+  "findings": [
+    {
+      "code": "alternating_loop",
+      "evidence": [
+        "e-alternating_loop"
+      ],
+      "recommendation": "fix",
+      "severity": "warning",
+      "summary": "alternating_loop"
+    },
+    {
+      "code": "user_correction",
+      "evidence": [
+        "e-user_correction"
+      ],
+      "recommendation": "fix",
+      "severity": "warning",
+      "summary": "user_correction"
+    }
+  ],
+  "graph": {
+    "edges": [],
+    "nodes": []
+  },
+  "metrics": {
+    "branches": 0,
+    "events": 10,
+    "tool_calls": 4,
+    "workflow_health": 62
+  },
+  "schema_version": 1,
+  "session": {
+    "format": "pi-v3",
+    "id": "matrix-alt-corr",
+    "metadata": {},
+    "source": "matrix-alt-corr.jsonl"
+  }
+}

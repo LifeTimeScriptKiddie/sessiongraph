@@ -1,0 +1,30 @@
+{
+  "findings_used": [
+    "errors",
+    "repeated_action"
+  ],
+  "flags": {
+    "checkpoint": false,
+    "classify": true,
+    "dangling": false,
+    "escalation": false,
+    "fallback": false,
+    "fast": false,
+    "handoff": false,
+    "preflight": false,
+    "retry": true
+  },
+  "guard_codes": [
+    "repeated_action"
+  ],
+  "mapping_version": "suggest-map-v1",
+  "markdown_graph": "Start \u2192 ClassifyFailure \u2192 Act \u2192 RetryBudget(2) \u2192 Verify \u2192 Done",
+  "pi_meta_name": "sg_errors_repair",
+  "pi_phases": [
+    "classify-then-act",
+    "bounded-retry",
+    "retry-with-new-hypothesis"
+  ],
+  "primary_finding": "errors",
+  "skipped": false
+}
