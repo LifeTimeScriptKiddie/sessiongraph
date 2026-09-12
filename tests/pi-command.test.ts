@@ -41,3 +41,9 @@ it("Pi manifest exposes both recorder and command entry points", () => {
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
   assert.deepEqual(pkg.pi.extensions, ["./extensions/pi/iseeagents-observer.ts", "./packages/sessiongraph/pi-extension/sessiongraph.ts"]);
 });
+it("Pi status does not mistake a reserved session path for a saved session", async () => {
+  const h = harness(false);
+  h.ctx.sessionManager.getSessionFile = () => join(h.cwd, "reserved-but-unsaved.jsonl");
+  await h.run("status");
+  assert.match(h.notices[0], /Current session: not saved yet/);
+});
