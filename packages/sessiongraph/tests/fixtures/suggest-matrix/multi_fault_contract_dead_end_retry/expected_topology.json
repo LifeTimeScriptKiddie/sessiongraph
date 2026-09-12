@@ -1,0 +1,35 @@
+{
+  "findings_used": [
+    "pipeline_contract",
+    "dead_end",
+    "repeated_action"
+  ],
+  "flags": {
+    "checkpoint": false,
+    "classify": false,
+    "dangling": false,
+    "escalation": false,
+    "fallback": false,
+    "fast": false,
+    "handoff": true,
+    "preflight": false,
+    "retry": true
+  },
+  "guard_codes": [
+    "dead_end",
+    "repeated_action"
+  ],
+  "mapping_version": "suggest-map-v1",
+  "markdown_graph": "Start \u2192 CheckContract \u2192 RepairProducer \u2192 RetryBudget(2) \u2192 VerifyArtifacts \u2192 Handoff \u2192 Done",
+  "pi_meta_name": "sg_pipeline_contract_repair",
+  "pi_phases": [
+    "check-contract",
+    "repair-producer",
+    "verify-artifacts",
+    "bounded-retry",
+    "retry-with-new-hypothesis",
+    "handoff"
+  ],
+  "primary_finding": "pipeline_contract",
+  "skipped": false
+}

@@ -1,0 +1,41 @@
+{
+  "id": "scenario-04",
+  "title": "Compact and resume: summary lineage without double-count",
+  "sessionId": "fix-s04",
+  "steps": [
+    {
+      "type": "user_prompt",
+      "requestId": "r1",
+      "prompt": "long prior conversation material"
+    },
+    {
+      "type": "context_file",
+      "requestId": "r1",
+      "path": "AGENTS.md",
+      "content": "policy text"
+    },
+    {
+      "type": "compaction",
+      "requestId": "r2",
+      "text": "Summary of prior turns about fixtures."
+    },
+    {
+      "type": "provider_payload",
+      "requestId": "r2",
+      "final": true,
+      "payload": {
+        "messages": [
+          { "role": "system", "content": "Summary of prior turns about fixtures." },
+          { "role": "user", "content": "resume work" }
+        ]
+      }
+    },
+    {
+      "type": "usage",
+      "requestId": "r2",
+      "input": 200,
+      "output": 40,
+      "cached": 50
+    }
+  ]
+}

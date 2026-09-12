@@ -1,0 +1,23 @@
+{
+  "id": "scenario-02",
+  "title": "Extension runs without injecting source text",
+  "sessionId": "fix-s02",
+  "steps": [
+    {
+      "type": "user_prompt",
+      "requestId": "r1",
+      "prompt": "noop"
+    },
+    {
+      "type": "extension_runtime",
+      "requestId": "r1",
+      "name": "iseeagents-observer"
+    },
+    {
+      "type": "provider_payload",
+      "requestId": "r1",
+      "final": true,
+      "payload": { "messages": [{ "role": "user", "content": "noop" }] }
+    }
+  ]
+}

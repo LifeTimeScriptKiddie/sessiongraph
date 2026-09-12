@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+build/
+dist/
+*.egg-info/
+.sessiongraph/
+sessiongraph-report/
+loop-run/candidates/
+loop-run/evaluations/
+loop-run/final.md
+loop-run/trace.jsonl
+loop-run/baseline-report.md

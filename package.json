@@ -1,0 +1,30 @@
+{
+  "name": "sessiongraph-workbench",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first agent session analysis and recorded context provenance",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts",
+    "./recorder": "./src/recorder.ts",
+    "./index/sqlite": "./src/index/sqlite.ts",
+    "./sessiongraph": "./src/sessiongraph/export.ts",
+    "./adapters/claude": "./src/adapters/claude.ts",
+    "./adapters/codex": "./src/adapters/codex.ts",
+    "./adapters/pi": "./src/adapters/pi.ts"
+  },
+  "scripts": {
+    "graph": "node --experimental-strip-types src/cli-graph.ts",
+    "ingest:codex": "node --experimental-strip-types src/cli-ingest-codex.ts",
+    "export:sessiongraph": "node --experimental-strip-types src/cli-export-sessiongraph.ts",
+    "test": "node --test --experimental-strip-types tests/*.test.ts",
+    "test:integration": "node --experimental-strip-types scripts/test-sessiongraph-integration.ts",
+    "demo": "node --experimental-strip-types scripts/create-public-demo.ts",
+    "check:public": "python3 scripts/check-public-source.py"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,3 @@
+{"id":"request","kind":"user_request","parent_ids":[]}
+{"id":"run","kind":"agent_run","parent_ids":["request"]}
+{"id":"response","kind":"final_response","role":"assistant","parent_ids":[]}

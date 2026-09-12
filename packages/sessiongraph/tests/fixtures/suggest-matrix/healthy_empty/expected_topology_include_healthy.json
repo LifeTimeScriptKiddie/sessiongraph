@@ -1,0 +1,24 @@
+{
+  "findings_used": [],
+  "flags": {
+    "checkpoint": false,
+    "classify": false,
+    "dangling": false,
+    "escalation": false,
+    "fallback": false,
+    "fast": false,
+    "handoff": false,
+    "preflight": false,
+    "retry": false
+  },
+  "guard_codes": [],
+  "mapping_version": "suggest-map-v1",
+  "markdown_graph": "Start \u2192 Do \u2192 Verify \u2192 Done",
+  "pi_meta_name": "sg_healthy_linear",
+  "pi_phases": [
+    "do",
+    "verify"
+  ],
+  "primary_finding": null,
+  "skipped": false
+}

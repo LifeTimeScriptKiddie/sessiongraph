@@ -1,0 +1,39 @@
+{
+  "findings": [
+    {
+      "code": "repeated_action",
+      "evidence": [
+        "e-repeated_action"
+      ],
+      "recommendation": "fix",
+      "severity": "warning",
+      "summary": "repeated_action"
+    },
+    {
+      "code": "errors",
+      "evidence": [
+        "e-errors"
+      ],
+      "recommendation": "fix",
+      "severity": "warning",
+      "summary": "errors"
+    }
+  ],
+  "graph": {
+    "edges": [],
+    "nodes": []
+  },
+  "metrics": {
+    "branches": 0,
+    "events": 10,
+    "tool_calls": 4,
+    "workflow_health": 76
+  },
+  "schema_version": 1,
+  "session": {
+    "format": "pi-v3",
+    "id": "matrix-errors-retry",
+    "metadata": {},
+    "source": "matrix-errors-retry.jsonl"
+  }
+}

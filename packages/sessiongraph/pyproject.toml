@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sessiongraph"
+version = "0.1.0"
+description = "Local-first coding-agent session loop and graph analyzer"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{name = "LifeTimeScriptKiddie"}]
+maintainers = [{name = "LifeTimeScriptKiddie"}]
+keywords = ["coding-agent", "observability", "session-analysis", "local-first", "privacy"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/LifeTimeScriptKiddie/sessiongraph"
+Issues = "https://github.com/LifeTimeScriptKiddie/sessiongraph/issues"
+
+[project.optional-dependencies]
+dev = ["setuptools==80.9.0", "build>=1.2", "pytest>=8", "networkx>=3.4,<4", "pyvis>=0.3.2,<0.4"]
+graph = ["networkx>=3.4,<4"]
+visual = ["networkx>=3.4,<4", "pyvis>=0.3.2,<0.4"]
+
+[project.scripts]
+sessiongraph = "sessiongraph.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv]
+exclude-newer = "2 weeks"
+
+[tool.setuptools.packages.find]
+where = ["src"]

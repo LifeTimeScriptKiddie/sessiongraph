@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>iseeagents · Activity tape</title>
+<style>
+:root{color-scheme:light dark;--paper:light-dark(#f4f2ec,#15181b);--surface:light-dark(#fffefb,#1f2428);--ink:light-dark(#1c262c,#edf0ed);--muted:light-dark(#5a6a73,#9aa7ad);--line:light-dark(#d0d4cf,#3f474e);--accent:light-dark(#a44325,#f19b78);--input:light-dark(#2f5d8c,#7eb6e8);--process:light-dark(#8b561e,#e5b477);--boundary:light-dark(#12644e,#82d5b3);--outcome:light-dark(#3d5a40,#a8c9ab);--health:light-dark(#8a3030,#e08a8a)}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;flex-direction:column;min-height:100vh}
+header{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;align-items:center;flex-shrink:0}
+header strong{font:600 18px Georgia,serif}header span,.eyebrow{font:10px/1.4 ui-monospace,monospace;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+.toolbar{display:flex;gap:14px;align-items:end;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid var(--line);flex-shrink:0;background:var(--surface)}
+label{display:grid;gap:4px;font-size:12px;color:var(--muted)}select,input,button{font:inherit;color:var(--ink)}
+select,input[type=file]{padding:7px 8px;background:var(--paper);border:1px solid var(--line);border-radius:4px;max-width:100%}
+button{cursor:pointer}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mode-toggle{display:flex;gap:6px}.mode-toggle button{border:1px solid var(--line);background:var(--paper);border-radius:4px;padding:7px 12px;font-size:12px}
+.mode-toggle button[aria-pressed=true]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+#load-status{margin:0;padding:8px 20px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);flex-shrink:0}
+#error{margin:0;padding:8px 20px;color:var(--accent);font-size:13px;flex-shrink:0}
+.split{flex:1;min-height:0;display:grid;grid-template-rows:minmax(180px,55%) 8px minmax(160px,45%)}
+.pane{min-height:0;overflow:auto;background:var(--paper)}
+.pane-top{border-bottom:1px solid var(--line)}.pane-bottom{background:var(--surface)}
+.splitter{background:var(--line);cursor:row-resize;position:relative}.splitter:hover{background:var(--accent)}
+.pane-head{position:sticky;top:0;z-index:2;background:inherit;padding:10px 20px 8px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.pane-head h1,.pane-head h2{margin:0;font:600 13px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:.02em}
+.pane-head span{font-size:11px;color:var(--muted)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);padding:0 20px 10px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.legend .p-input i{background:var(--input)}.legend .p-process i{background:var(--process)}.legend .p-boundary i{background:var(--boundary)}.legend .p-outcome i{background:var(--outcome)}.legend .p-health i{background:var(--health)}
+#activity-list{list-style:none;margin:0;padding:0 12px 24px}
+.activity-row{display:grid;grid-template-columns:72px 88px 100px 1fr 110px;gap:10px;align-items:start;width:100%;text-align:left;padding:10px 12px;margin:4px 0;border:1px solid transparent;border-radius:5px;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.activity-row:hover{background:color-mix(in srgb, var(--surface) 80%, var(--paper))}
+.activity-row[aria-pressed=true]{border-color:var(--accent);background:var(--surface);outline:none}
+.activity-row .time{font:11px ui-monospace,monospace;color:var(--muted)}
+.activity-row .phase{font:11px ui-monospace,monospace;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.activity-row .phase.input{color:var(--input)}.activity-row .phase.process{color:var(--process)}.activity-row .phase.boundary{color:var(--boundary)}.activity-row .phase.outcome{color:var(--outcome)}.activity-row .phase.health{color:var(--health)}
+.activity-row .agent{font:11px ui-monospace,monospace;color:var(--muted)}.activity-row .title{font-size:13px;overflow-wrap:anywhere}.activity-row .evidence{font:10px ui-monospace,monospace;color:var(--muted);text-align:right}
+.empty{padding:24px 20px;color:var(--muted);font-size:13px}
+.detail-body{padding:10px 16px 20px;height:100%;min-height:0}
+.detail-sections{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);grid-template-areas:"lead lead" "what evidence" "where usage" "message message" "links session";gap:10px 12px;align-content:start}
+.detail-section{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--paper);min-width:0}
+.detail-section h3{margin:0 0 6px;font:600 11px ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.slot-lead{grid-area:lead;border:0;background:transparent;padding:0}.slot-what{grid-area:what}.slot-where{grid-area:where}.slot-message{grid-area:message}.slot-links{grid-area:links}.slot-evidence{grid-area:evidence}.slot-usage{grid-area:usage}.slot-session{grid-area:session}
+.details-grid{display:grid;grid-template-columns:118px minmax(0,1fr);gap:4px 10px;font-size:12px}.details-grid dt{color:var(--muted)}.details-grid dd{margin:0;overflow-wrap:anywhere;font-family:ui-monospace,monospace}
+.detail-lead{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:0;font-size:12px;color:var(--muted)}
+.detail-lead .badge{font:600 10px ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:999px;border:1px solid var(--line)}
+.detail-lead .badge.input{color:var(--input);border-color:color-mix(in srgb,var(--input) 45%,var(--line))}
+.detail-lead .badge.process{color:var(--process);border-color:color-mix(in srgb,var(--process) 45%,var(--line))}
+.detail-lead .badge.boundary{color:var(--boundary);border-color:color-mix(in srgb,var(--boundary) 45%,var(--line))}
+.detail-lead .badge.outcome{color:var(--outcome);border-color:color-mix(in srgb,var(--outcome) 45%,var(--line))}
+.detail-lead .badge.health{color:var(--health);border-color:color-mix(in srgb,var(--health) 45%,var(--line))}
+.message-box{margin:0;font-size:12px;line-height:1.45;color:var(--ink);background:color-mix(in srgb,var(--paper) 70%,var(--surface));border:1px dashed var(--line);border-radius:4px;padding:8px 10px;max-height:min(48vh,520px);overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-family:ui-monospace,Menlo,monospace}
+.links{padding-left:18px;margin:0;font-size:12px;overflow-wrap:anywhere}.links li{padding:2px 0}
+.notice{font-size:12px;color:var(--muted);margin:6px 0 0}
+#page-extras{border-top:1px solid var(--line);background:var(--surface);flex-shrink:0}
+#page-extras[hidden]{display:none!important}
+#provenance-view[hidden],#activity-view[hidden]{display:none!important}
+#graph-board{position:relative;isolation:isolate;padding:12px 20px 22px}.lanes{display:grid;grid-template-columns:1.2fr .95fr 1fr 1fr;gap:24px;position:relative;z-index:1}
+.lane h2{margin:0 0 12px;color:var(--muted);font:11px ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase}
+.nodes{display:grid;gap:10px;align-content:start}
+.node{display:grid;gap:4px;text-align:left;background:var(--surface);padding:12px;border:1px solid var(--line);border-radius:5px;width:100%;overflow-wrap:anywhere}
+.node small{font-size:11px;color:var(--muted)}.node.matched{border-left:3px solid var(--boundary)}.node.ancestral{border-left:3px solid var(--process)}
+.node[aria-pressed=true]{outline:2px solid var(--accent);outline-offset:2px}
+.empty-node{border:1px dashed var(--line);padding:14px;font-size:12px;color:var(--muted)}
+#connections{position:absolute;inset:0;width:100%;height:100%;overflow:visible;z-index:0;pointer-events:none}
+.connector{fill:none;stroke:var(--line);stroke-width:1.5}.connector.observed_text_match{stroke:var(--boundary)}.connector.summary_ancestor{stroke:var(--process);stroke-dasharray:5 4}
+.below{display:grid;grid-template-columns:1.4fr 1fr;gap:24px;padding:0 20px 20px;border-top:1px solid var(--line);padding-top:14px}
+.readout{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:12px;padding:8px 20px;color:var(--muted)}
+details{border-top:1px solid var(--line);padding:12px 20px;margin:0}summary{cursor:pointer;font-size:13px;font-weight:500}
+.questions{display:grid;gap:14px;max-width:850px;padding:12px 0}fieldset{padding:0;border:0;margin:0}legend{font-size:13px;margin-bottom:4px}
+fieldset label{display:flex;align-items:start;gap:8px;margin:4px 0;color:var(--muted);font-size:12px}
+.action{background:var(--ink);color:var(--paper);border:0;border-radius:4px;padding:9px 14px}.action.secondary{background:transparent;color:var(--ink);border:1px solid var(--line)}
+footer{padding:12px 20px 20px;font-size:11px;color:var(--muted);flex-shrink:0}
+[hidden]{display:none!important}
+@media(max-width:900px){.activity-row{grid-template-columns:64px 72px 1fr;grid-template-areas:"time phase evidence" "title title title" "agent agent agent"}.activity-row .time{grid-area:time}.activity-row .phase{grid-area:phase}.activity-row .evidence{grid-area:evidence;text-align:left}.activity-row .title{grid-area:title}.activity-row .agent{grid-area:agent}.lanes{grid-template-columns:1fr 1fr}.below{grid-template-columns:1fr}.split{grid-template-rows:minmax(140px,50%) 8px minmax(140px,50%)}.detail-sections{grid-template-columns:1fr;grid-template-areas:"lead" "what" "evidence" "where" "usage" "message" "links" "session"}}
+@media(max-width:520px){.lanes{grid-template-columns:1fr}.details-grid{grid-template-columns:1fr}.toolbar{padding:10px 14px}header{padding:10px 14px}}
+</style></head><body>
+<header><strong>iseeagents</strong><span id="header-mode">Activity tape · local only</span></header>
+<div class="toolbar">
+  <div class="mode-toggle" role="group" aria-label="View mode">
+    <button type="button" id="mode-activity" aria-pressed="true">Activity</button>
+    <button type="button" id="mode-provenance" aria-pressed="false">Provenance</button>
+  </div>
+  <label>Turn / request<select id="request-picker"></select></label>
+  <label>Open a local capture<input type="file" id="capture-file" accept=".jsonl,.json,application/json,text/plain"></label>
+</div>
+<p id="load-status" aria-live="polite"></p>
+<p id="error" role="alert" hidden></p>
+
+<div id="activity-view" class="split">
+  <section class="pane pane-top" aria-label="Activity tape">
+    <div class="pane-head"><h1>Activity</h1><span id="activity-summary"></span></div>
+    <div class="legend">
+      <span class="p-input"><i></i>input</span>
+      <span class="p-process"><i></i>process</span>
+      <span class="p-boundary"><i></i>boundary</span>
+      <span class="p-outcome"><i></i>outcome</span>
+      <span class="p-health"><i></i>health</span>
+    </div>
+    <ul id="activity-list"></ul>
+  </section>
+  <div class="splitter" id="splitter" role="separator" aria-orientation="horizontal" aria-label="Resize detail pane" tabindex="0"></div>
+  <section class="pane pane-bottom" aria-label="Step detail">
+    <div class="pane-head"><h2 id="detail-title">Select a step</h2><span id="detail-phase"></span></div>
+    <div class="detail-body" id="detail-body">
+      <p class="empty" id="detail-empty">Select a row above to inspect what / where / links / evidence.</p>
+      <div class="detail-sections" id="detail-sections" hidden></div>
+    </div>
+  </section>
+</div>
+
+<div id="provenance-view" hidden>
+  <div class="readout" aria-live="polite"><strong id="request-summary"></strong><span id="output-summary"></span></div>
+  <div id="graph-board" aria-label="Recorded input and response relationships"><svg id="connections" aria-hidden="true"></svg><div class="lanes">
+    <section class="lane"><h2>01 / Observed inputs</h2><div id="source-nodes" class="nodes"></div></section>
+    <section class="lane"><h2>02 / Transformations</h2><div id="transform-nodes" class="nodes"></div></section>
+    <section class="lane"><h2>03 / Request boundary</h2><div id="request-nodes" class="nodes"></div></section>
+    <section class="lane"><h2>04 / Observed result</h2><div id="response-nodes" class="nodes"></div></section>
+  </div></div>
+  <div class="below"><section><div class="detail-title"><h2 id="prov-detail-title">Evidence</h2></div><dl id="node-detail" class="details-grid"></dl><h2>Recorded connections</h2><ul class="links" id="edge-list"></ul></section>
+  <section><h2>What this capture can support</h2><p class="notice" id="coverage-summary"></p><p class="notice">A request/response link identifies an observed association. It does not prove which input caused the answer.</p><h2>Reported usage</h2><ul id="usage-list" class="links"></ul><h2>SessionGraph checks</h2><ul id="sessiongraph-findings" class="links"></ul></section></div>
+</div>
+
+<div id="page-extras" hidden>
+<details><summary>Capture gaps and graph integrity</summary><ul id="issue-list" class="links"></ul></details>
+<details><summary>Check your interpretation</summary>
+  <p class="notice">Five questions about what the capture can establish. Answers stay on this page.</p>
+  <form id="study-form"><div id="questions" class="questions"></div>
+    <button class="action" type="submit">Check my answers</button>
+    <button id="download-result" class="action secondary" type="button" hidden>Save my result</button>
+  </form>
+  <p id="study-result" aria-live="polite"></p>
+</details>
+</div>
+<footer>Activity is chronological observation, not influence. Line spans appear only when the adapter recorded a runtime line range. Prefer a visible copy of the JSONL if your file picker hides dotfolders. Dataset: <span id="dataset-label"></span></footer>
+<script type="application/json" id="capture-data">__ISEEAGENTS_DATA__</script>
+<script>__ISEEAGENTS_ACTIVITY__
+__ISEEAGENTS_GRAPH__
+__ISEEAGENTS_VIEWER__</script>
+</body></html>

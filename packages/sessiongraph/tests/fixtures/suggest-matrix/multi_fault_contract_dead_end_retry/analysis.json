@@ -1,0 +1,57 @@
+{
+  "findings": [
+    {
+      "code": "pipeline_contract",
+      "evidence": [
+        "e-pipeline_contract"
+      ],
+      "recommendation": "fix",
+      "severity": "critical",
+      "summary": "missing final-report"
+    },
+    {
+      "code": "dead_end",
+      "evidence": [
+        "e-dead_end"
+      ],
+      "recommendation": "fix",
+      "severity": "warning",
+      "summary": "dead_end"
+    },
+    {
+      "code": "agent_timeout",
+      "evidence": [
+        "e-agent_timeout"
+      ],
+      "recommendation": "fix",
+      "severity": "warning",
+      "summary": "agent_timeout"
+    },
+    {
+      "code": "repeated_action",
+      "evidence": [
+        "e-repeated_action"
+      ],
+      "recommendation": "fix",
+      "severity": "warning",
+      "summary": "repeated_action"
+    }
+  ],
+  "graph": {
+    "edges": [],
+    "nodes": []
+  },
+  "metrics": {
+    "branches": 0,
+    "events": 10,
+    "tool_calls": 4,
+    "workflow_health": 40
+  },
+  "schema_version": 1,
+  "session": {
+    "format": "pi-v3",
+    "id": "matrix-multi",
+    "metadata": {},
+    "source": "matrix-multi.jsonl"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "id": "scenario-03",
+  "title": "Repeat read and file change preserve version identity",
+  "sessionId": "fix-s03",
+  "steps": [
+    {
+      "type": "tool_result",
+      "requestId": "r1",
+      "toolCallId": "call_a",
+      "toolName": "read",
+      "content": "version-one"
+    },
+    {
+      "type": "provider_payload",
+      "requestId": "r1",
+      "final": true,
+      "payload": { "messages": [{ "role": "tool", "content": "version-one" }] }
+    },
+    {
+      "type": "file_change",
+      "path": "sample.ts",
+      "content": "version-two"
+    },
+    {
+      "type": "tool_result",
+      "requestId": "r2",
+      "toolCallId": "call_b",
+      "toolName": "read",
+      "content": "version-two"
+    },
+    {
+      "type": "provider_payload",
+      "requestId": "r2",
+      "final": true,
+      "payload": {
+        "messages": [
+          { "role": "tool", "content": "version-one" },
+          { "role": "tool", "content": "version-two" }
+        ]
+      }
+    }
+  ]
+}

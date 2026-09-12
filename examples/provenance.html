@@ -1,0 +1,938 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>iseeagents · Activity tape</title>
+<style>
+:root{color-scheme:light dark;--paper:light-dark(#f4f2ec,#15181b);--surface:light-dark(#fffefb,#1f2428);--ink:light-dark(#1c262c,#edf0ed);--muted:light-dark(#5a6a73,#9aa7ad);--line:light-dark(#d0d4cf,#3f474e);--accent:light-dark(#a44325,#f19b78);--input:light-dark(#2f5d8c,#7eb6e8);--process:light-dark(#8b561e,#e5b477);--boundary:light-dark(#12644e,#82d5b3);--outcome:light-dark(#3d5a40,#a8c9ab);--health:light-dark(#8a3030,#e08a8a)}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;display:flex;flex-direction:column;min-height:100vh}
+header{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;align-items:center;flex-shrink:0}
+header strong{font:600 18px Georgia,serif}header span,.eyebrow{font:10px/1.4 ui-monospace,monospace;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+.toolbar{display:flex;gap:14px;align-items:end;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid var(--line);flex-shrink:0;background:var(--surface)}
+label{display:grid;gap:4px;font-size:12px;color:var(--muted)}select,input,button{font:inherit;color:var(--ink)}
+select,input[type=file]{padding:7px 8px;background:var(--paper);border:1px solid var(--line);border-radius:4px;max-width:100%}
+button{cursor:pointer}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mode-toggle{display:flex;gap:6px}.mode-toggle button{border:1px solid var(--line);background:var(--paper);border-radius:4px;padding:7px 12px;font-size:12px}
+.mode-toggle button[aria-pressed=true]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+#load-status{margin:0;padding:8px 20px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);flex-shrink:0}
+#error{margin:0;padding:8px 20px;color:var(--accent);font-size:13px;flex-shrink:0}
+.split{flex:1;min-height:0;display:grid;grid-template-rows:minmax(180px,55%) 8px minmax(160px,45%)}
+.pane{min-height:0;overflow:auto;background:var(--paper)}
+.pane-top{border-bottom:1px solid var(--line)}.pane-bottom{background:var(--surface)}
+.splitter{background:var(--line);cursor:row-resize;position:relative}.splitter:hover{background:var(--accent)}
+.pane-head{position:sticky;top:0;z-index:2;background:inherit;padding:10px 20px 8px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.pane-head h1,.pane-head h2{margin:0;font:600 13px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:.02em}
+.pane-head span{font-size:11px;color:var(--muted)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);padding:0 20px 10px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.legend .p-input i{background:var(--input)}.legend .p-process i{background:var(--process)}.legend .p-boundary i{background:var(--boundary)}.legend .p-outcome i{background:var(--outcome)}.legend .p-health i{background:var(--health)}
+#activity-list{list-style:none;margin:0;padding:0 12px 24px}
+.activity-row{display:grid;grid-template-columns:72px 88px 100px 1fr 110px;gap:10px;align-items:start;width:100%;text-align:left;padding:10px 12px;margin:4px 0;border:1px solid transparent;border-radius:5px;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.activity-row:hover{background:color-mix(in srgb, var(--surface) 80%, var(--paper))}
+.activity-row[aria-pressed=true]{border-color:var(--accent);background:var(--surface);outline:none}
+.activity-row .time{font:11px ui-monospace,monospace;color:var(--muted)}
+.activity-row .phase{font:11px ui-monospace,monospace;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.activity-row .phase.input{color:var(--input)}.activity-row .phase.process{color:var(--process)}.activity-row .phase.boundary{color:var(--boundary)}.activity-row .phase.outcome{color:var(--outcome)}.activity-row .phase.health{color:var(--health)}
+.activity-row .agent{font:11px ui-monospace,monospace;color:var(--muted)}.activity-row .title{font-size:13px;overflow-wrap:anywhere}.activity-row .evidence{font:10px ui-monospace,monospace;color:var(--muted);text-align:right}
+.empty{padding:24px 20px;color:var(--muted);font-size:13px}
+.detail-body{padding:10px 16px 20px;height:100%;min-height:0}
+.detail-sections{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);grid-template-areas:"lead lead" "what evidence" "where usage" "message message" "links session";gap:10px 12px;align-content:start}
+.detail-section{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--paper);min-width:0}
+.detail-section h3{margin:0 0 6px;font:600 11px ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.slot-lead{grid-area:lead;border:0;background:transparent;padding:0}.slot-what{grid-area:what}.slot-where{grid-area:where}.slot-message{grid-area:message}.slot-links{grid-area:links}.slot-evidence{grid-area:evidence}.slot-usage{grid-area:usage}.slot-session{grid-area:session}
+.details-grid{display:grid;grid-template-columns:118px minmax(0,1fr);gap:4px 10px;font-size:12px}.details-grid dt{color:var(--muted)}.details-grid dd{margin:0;overflow-wrap:anywhere;font-family:ui-monospace,monospace}
+.detail-lead{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:0;font-size:12px;color:var(--muted)}
+.detail-lead .badge{font:600 10px ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:999px;border:1px solid var(--line)}
+.detail-lead .badge.input{color:var(--input);border-color:color-mix(in srgb,var(--input) 45%,var(--line))}
+.detail-lead .badge.process{color:var(--process);border-color:color-mix(in srgb,var(--process) 45%,var(--line))}
+.detail-lead .badge.boundary{color:var(--boundary);border-color:color-mix(in srgb,var(--boundary) 45%,var(--line))}
+.detail-lead .badge.outcome{color:var(--outcome);border-color:color-mix(in srgb,var(--outcome) 45%,var(--line))}
+.detail-lead .badge.health{color:var(--health);border-color:color-mix(in srgb,var(--health) 45%,var(--line))}
+.message-box{margin:0;font-size:12px;line-height:1.45;color:var(--ink);background:color-mix(in srgb,var(--paper) 70%,var(--surface));border:1px dashed var(--line);border-radius:4px;padding:8px 10px;max-height:min(48vh,520px);overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-family:ui-monospace,Menlo,monospace}
+.links{padding-left:18px;margin:0;font-size:12px;overflow-wrap:anywhere}.links li{padding:2px 0}
+.notice{font-size:12px;color:var(--muted);margin:6px 0 0}
+#page-extras{border-top:1px solid var(--line);background:var(--surface);flex-shrink:0}
+#page-extras[hidden]{display:none!important}
+#provenance-view[hidden],#activity-view[hidden]{display:none!important}
+#graph-board{position:relative;isolation:isolate;padding:12px 20px 22px}.lanes{display:grid;grid-template-columns:1.2fr .95fr 1fr 1fr;gap:24px;position:relative;z-index:1}
+.lane h2{margin:0 0 12px;color:var(--muted);font:11px ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase}
+.nodes{display:grid;gap:10px;align-content:start}
+.node{display:grid;gap:4px;text-align:left;background:var(--surface);padding:12px;border:1px solid var(--line);border-radius:5px;width:100%;overflow-wrap:anywhere}
+.node small{font-size:11px;color:var(--muted)}.node.matched{border-left:3px solid var(--boundary)}.node.ancestral{border-left:3px solid var(--process)}
+.node[aria-pressed=true]{outline:2px solid var(--accent);outline-offset:2px}
+.empty-node{border:1px dashed var(--line);padding:14px;font-size:12px;color:var(--muted)}
+#connections{position:absolute;inset:0;width:100%;height:100%;overflow:visible;z-index:0;pointer-events:none}
+.connector{fill:none;stroke:var(--line);stroke-width:1.5}.connector.observed_text_match{stroke:var(--boundary)}.connector.summary_ancestor{stroke:var(--process);stroke-dasharray:5 4}
+.below{display:grid;grid-template-columns:1.4fr 1fr;gap:24px;padding:0 20px 20px;border-top:1px solid var(--line);padding-top:14px}
+.readout{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:12px;padding:8px 20px;color:var(--muted)}
+details{border-top:1px solid var(--line);padding:12px 20px;margin:0}summary{cursor:pointer;font-size:13px;font-weight:500}
+.questions{display:grid;gap:14px;max-width:850px;padding:12px 0}fieldset{padding:0;border:0;margin:0}legend{font-size:13px;margin-bottom:4px}
+fieldset label{display:flex;align-items:start;gap:8px;margin:4px 0;color:var(--muted);font-size:12px}
+.action{background:var(--ink);color:var(--paper);border:0;border-radius:4px;padding:9px 14px}.action.secondary{background:transparent;color:var(--ink);border:1px solid var(--line)}
+footer{padding:12px 20px 20px;font-size:11px;color:var(--muted);flex-shrink:0}
+[hidden]{display:none!important}
+@media(max-width:900px){.activity-row{grid-template-columns:64px 72px 1fr;grid-template-areas:"time phase evidence" "title title title" "agent agent agent"}.activity-row .time{grid-area:time}.activity-row .phase{grid-area:phase}.activity-row .evidence{grid-area:evidence;text-align:left}.activity-row .title{grid-area:title}.activity-row .agent{grid-area:agent}.lanes{grid-template-columns:1fr 1fr}.below{grid-template-columns:1fr}.split{grid-template-rows:minmax(140px,50%) 8px minmax(140px,50%)}.detail-sections{grid-template-columns:1fr;grid-template-areas:"lead" "what" "evidence" "where" "usage" "message" "links" "session"}}
+@media(max-width:520px){.lanes{grid-template-columns:1fr}.details-grid{grid-template-columns:1fr}.toolbar{padding:10px 14px}header{padding:10px 14px}}
+</style></head><body>
+<header><strong>iseeagents</strong><span id="header-mode">Activity tape · local only</span></header>
+<div class="toolbar">
+  <div class="mode-toggle" role="group" aria-label="View mode">
+    <button type="button" id="mode-activity" aria-pressed="true">Activity</button>
+    <button type="button" id="mode-provenance" aria-pressed="false">Provenance</button>
+  </div>
+  <label>Turn / request<select id="request-picker"></select></label>
+  <label>Open a local capture<input type="file" id="capture-file" accept=".jsonl,.json,application/json,text/plain"></label>
+</div>
+<p id="load-status" aria-live="polite"></p>
+<p id="error" role="alert" hidden></p>
+
+<div id="activity-view" class="split">
+  <section class="pane pane-top" aria-label="Activity tape">
+    <div class="pane-head"><h1>Activity</h1><span id="activity-summary"></span></div>
+    <div class="legend">
+      <span class="p-input"><i></i>input</span>
+      <span class="p-process"><i></i>process</span>
+      <span class="p-boundary"><i></i>boundary</span>
+      <span class="p-outcome"><i></i>outcome</span>
+      <span class="p-health"><i></i>health</span>
+    </div>
+    <ul id="activity-list"></ul>
+  </section>
+  <div class="splitter" id="splitter" role="separator" aria-orientation="horizontal" aria-label="Resize detail pane" tabindex="0"></div>
+  <section class="pane pane-bottom" aria-label="Step detail">
+    <div class="pane-head"><h2 id="detail-title">Select a step</h2><span id="detail-phase"></span></div>
+    <div class="detail-body" id="detail-body">
+      <p class="empty" id="detail-empty">Select a row above to inspect what / where / links / evidence.</p>
+      <div class="detail-sections" id="detail-sections" hidden></div>
+    </div>
+  </section>
+</div>
+
+<div id="provenance-view" hidden>
+  <div class="readout" aria-live="polite"><strong id="request-summary"></strong><span id="output-summary"></span></div>
+  <div id="graph-board" aria-label="Recorded input and response relationships"><svg id="connections" aria-hidden="true"></svg><div class="lanes">
+    <section class="lane"><h2>01 / Observed inputs</h2><div id="source-nodes" class="nodes"></div></section>
+    <section class="lane"><h2>02 / Transformations</h2><div id="transform-nodes" class="nodes"></div></section>
+    <section class="lane"><h2>03 / Request boundary</h2><div id="request-nodes" class="nodes"></div></section>
+    <section class="lane"><h2>04 / Observed result</h2><div id="response-nodes" class="nodes"></div></section>
+  </div></div>
+  <div class="below"><section><div class="detail-title"><h2 id="prov-detail-title">Evidence</h2></div><dl id="node-detail" class="details-grid"></dl><h2>Recorded connections</h2><ul class="links" id="edge-list"></ul></section>
+  <section><h2>What this capture can support</h2><p class="notice" id="coverage-summary"></p><p class="notice">A request/response link identifies an observed association. It does not prove which input caused the answer.</p><h2>Reported usage</h2><ul id="usage-list" class="links"></ul><h2>SessionGraph checks</h2><ul id="sessiongraph-findings" class="links"></ul></section></div>
+</div>
+
+<div id="page-extras" hidden>
+<details><summary>Capture gaps and graph integrity</summary><ul id="issue-list" class="links"></ul></details>
+<details><summary>Check your interpretation</summary>
+  <p class="notice">Five questions about what the capture can establish. Answers stay on this page.</p>
+  <form id="study-form"><div id="questions" class="questions"></div>
+    <button class="action" type="submit">Check my answers</button>
+    <button id="download-result" class="action secondary" type="button" hidden>Save my result</button>
+  </form>
+  <p id="study-result" aria-live="polite"></p>
+</details>
+</div>
+<footer>Activity is chronological observation, not influence. Line spans appear only when the adapter recorded a runtime line range. Prefer a visible copy of the JSONL if your file picker hides dotfolders. Dataset: <span id="dataset-label"></span></footer>
+<script type="application/json" id="capture-data">{"events":[{"schemaVersion":"iseeagents.context.v1","eventId":"07da168d-a791-4c50-9c37-25e3f97bdaa7","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r1","attemptId":"r1:a1","toolCallId":null,"producerSeq":1,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.382Z","parentEventIds":[],"sourceCategory":"user_input","sourceAlias":"Your question","sourcePath":null,"sourceKey":"0731239c4a629c91d7ca0f5e78c09aeb","contentVersionKey":"cv_e4062cc18f30c44a26679802639a70b8","sourceRange":null,"encoding":null,"observation":"load","evidence":"runtime_loaded","adapterId":"fixture","adapterVersion":"graph-v1","boundary":"fixture.input","handlerOrdinal":null,"coverage":"full","requestSpan":null,"sourceSpan":null,"matchMethod":null,"ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":9,"byteCount":36,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"ccaf27aa-8803-4c52-bf95-62b9951cd26e","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r1","attemptId":"r1:a1","toolCallId":null,"producerSeq":2,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.383Z","parentEventIds":[],"sourceCategory":"system_input","sourceAlias":"System instruction","sourcePath":null,"sourceKey":"638058bd2b96ea51ff65a6ae2ef5fcc4","contentVersionKey":"cv_b78b7596c97e0c51243bb76903b2aa17","sourceRange":null,"encoding":null,"observation":"load","evidence":"runtime_loaded","adapterId":"fixture","adapterVersion":"graph-v1","boundary":"fixture.input","handlerOrdinal":null,"coverage":"full","requestSpan":null,"sourceSpan":null,"matchMethod":null,"ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":8,"byteCount":29,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"a5ade3f1-1bae-4f5a-8187-a70e00406d3a","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r1","attemptId":"r1:a1","toolCallId":null,"producerSeq":3,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.383Z","parentEventIds":[],"sourceCategory":"file_input","sourceAlias":"sample.ts · excerpt v1","sourcePath":null,"sourceKey":"5cf3a16d594009a35737f6b6679dc23b","contentVersionKey":"cv_858776cb0c183d457b7f19afa4ba3f03","sourceRange":null,"encoding":null,"observation":"read","evidence":"read_result","adapterId":"fixture","adapterVersion":"graph-v1","boundary":"fixture.input","handlerOrdinal":null,"coverage":"full","requestSpan":null,"sourceSpan":null,"matchMethod":null,"ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":4,"byteCount":13,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"487e44cd-4359-44aa-ab41-98a49076de00","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r1","attemptId":"r1:a1","toolCallId":null,"producerSeq":4,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.383Z","parentEventIds":[],"sourceCategory":"skill","sourceAlias":"SKILL.md · available only","sourcePath":null,"sourceKey":null,"contentVersionKey":null,"sourceRange":null,"encoding":null,"observation":"inventory","evidence":"inventoried","adapterId":"fixture","adapterVersion":"graph-v1","boundary":"fixture.inventory","handlerOrdinal":null,"coverage":"full","requestSpan":null,"sourceSpan":null,"matchMethod":null,"ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":null,"byteCount":null,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"d7553af3-c4f5-400e-b571-60e991e907e8","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r1","attemptId":"r1:a1","toolCallId":null,"producerSeq":5,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.383Z","parentEventIds":[],"sourceCategory":"other","sourceAlias":"Observer extension · runs only","sourcePath":null,"sourceKey":null,"contentVersionKey":null,"sourceRange":null,"encoding":null,"observation":"load","evidence":"runtime_loaded","adapterId":"fixture","adapterVersion":"graph-v1","boundary":"extension_execute","handlerOrdinal":null,"coverage":"full","requestSpan":null,"sourceSpan":null,"matchMethod":null,"ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":null,"byteCount":null,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"f26ee9c3-b82f-49d7-a0e1-dc9500f8b9f5","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r1","attemptId":"r1:a1","toolCallId":null,"producerSeq":6,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.384Z","parentEventIds":[],"sourceCategory":"unattributed","sourceAlias":"provider_payload","sourcePath":null,"sourceKey":"5709651eb4df3d31d972c1b8312d8a6d","contentVersionKey":"cv_5b8b442fb4efdd9267e1391cc610d803","sourceRange":null,"encoding":"json","observation":"payload","evidence":"payload_snapshot","adapterId":"pi","adapterVersion":"0.85.1-observer-s3","boundary":"before_provider_request.provisional","handlerOrdinal":0,"coverage":"partial","requestSpan":null,"sourceSpan":null,"matchMethod":"sha256:99d628179946c9a0","ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":46,"byteCount":181,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"10e293b1-a947-42c3-be61-6f9d256339a9","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r1","attemptId":"r1:a1","toolCallId":null,"producerSeq":7,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.384Z","parentEventIds":["07da168d-a791-4c50-9c37-25e3f97bdaa7","f26ee9c3-b82f-49d7-a0e1-dc9500f8b9f5"],"sourceCategory":"user_input","sourceAlias":"Your question","sourcePath":null,"sourceKey":"0731239c4a629c91d7ca0f5e78c09aeb","contentVersionKey":"cv_e4062cc18f30c44a26679802639a70b8","sourceRange":null,"encoding":"utf8","observation":"inclusion","evidence":"payload_snapshot","adapterId":"pi","adapterVersion":"0.85.1-observer-s3","boundary":"before_provider_request.provisional","handlerOrdinal":null,"coverage":"partial","requestSpan":{"start":0,"end":36},"sourceSpan":{"start":0,"end":36},"matchMethod":"exact_utf8_text_field:/messages/1/content","ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":null,"byteCount":null,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"ac10e622-8a58-4d9c-a244-12c067be8508","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r1","attemptId":"r1:a1","toolCallId":null,"producerSeq":8,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.384Z","parentEventIds":["ccaf27aa-8803-4c52-bf95-62b9951cd26e","f26ee9c3-b82f-49d7-a0e1-dc9500f8b9f5"],"sourceCategory":"system_input","sourceAlias":"System instruction","sourcePath":null,"sourceKey":"638058bd2b96ea51ff65a6ae2ef5fcc4","contentVersionKey":"cv_b78b7596c97e0c51243bb76903b2aa17","sourceRange":null,"encoding":"utf8","observation":"inclusion","evidence":"payload_snapshot","adapterId":"pi","adapterVersion":"0.85.1-observer-s3","boundary":"before_provider_request.provisional","handlerOrdinal":null,"coverage":"partial","requestSpan":{"start":0,"end":29},"sourceSpan":{"start":0,"end":29},"matchMethod":"exact_utf8_text_field:/messages/0/content","ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":null,"byteCount":null,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"34498f31-7c56-4aee-baf6-ead10854c5bc","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r1","attemptId":"r1:a1","toolCallId":null,"producerSeq":9,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.384Z","parentEventIds":["a5ade3f1-1bae-4f5a-8187-a70e00406d3a","f26ee9c3-b82f-49d7-a0e1-dc9500f8b9f5"],"sourceCategory":"file_input","sourceAlias":"sample.ts · excerpt v1","sourcePath":null,"sourceKey":"5cf3a16d594009a35737f6b6679dc23b","contentVersionKey":"cv_858776cb0c183d457b7f19afa4ba3f03","sourceRange":null,"encoding":"utf8","observation":"inclusion","evidence":"payload_snapshot","adapterId":"pi","adapterVersion":"0.85.1-observer-s3","boundary":"before_provider_request.provisional","handlerOrdinal":null,"coverage":"partial","requestSpan":{"start":0,"end":13},"sourceSpan":{"start":0,"end":13},"matchMethod":"exact_utf8_text_field:/messages/2/content","ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":null,"byteCount":null,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"05f68673-8652-4975-8226-35d8a6a3f304","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r1","attemptId":"r1:a1","toolCallId":null,"producerSeq":10,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.384Z","parentEventIds":["f26ee9c3-b82f-49d7-a0e1-dc9500f8b9f5"],"sourceCategory":"model_output","sourceAlias":"Assistant response","sourcePath":null,"sourceKey":null,"contentVersionKey":"cv_25c9bdf0e18965f6c331d57c214fd35a","sourceRange":null,"encoding":null,"observation":"response","evidence":"runtime_loaded","adapterId":"fixture","adapterVersion":"graph-v1","boundary":"message_end.assistant","handlerOrdinal":null,"coverage":"partial","requestSpan":null,"sourceSpan":null,"matchMethod":null,"ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":null,"byteCount":48,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"6a45cdd6-99e0-4404-bcf5-cc58a490da29","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r1","attemptId":"r1:a1","toolCallId":null,"producerSeq":11,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.384Z","parentEventIds":[],"sourceCategory":null,"sourceAlias":null,"sourcePath":null,"sourceKey":null,"contentVersionKey":null,"sourceRange":null,"encoding":null,"observation":"usage","evidence":"final_dispatch","adapterId":"pi","adapterVersion":"0.85.1-observer-s3","boundary":"provider_usage","handlerOrdinal":null,"coverage":"full","requestSpan":null,"sourceSpan":null,"matchMethod":null,"ambiguity":null,"lineageEventIds":[],"usageInputTokens":240,"usageOutputTokens":32,"usageCachedTokens":80,"estimatedTokens":null,"byteCount":null,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"b76cbc94-bc9f-4a4b-b01e-a99177ce6c61","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r2","attemptId":"r2:a1","toolCallId":null,"producerSeq":12,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.384Z","parentEventIds":[],"sourceCategory":"summary","sourceAlias":"Compaction summary","sourcePath":null,"sourceKey":"2c9618ee06b3d76df82adf54c0d80d1b","contentVersionKey":"cv_3409eee60be71eee0735c0ac36f74ec6","sourceRange":null,"encoding":null,"observation":"transform","evidence":"summary_ancestor","adapterId":"fixture","adapterVersion":"graph-v1","boundary":"fixture.compaction","handlerOrdinal":null,"coverage":"full","requestSpan":null,"sourceSpan":null,"matchMethod":null,"ambiguity":null,"lineageEventIds":["07da168d-a791-4c50-9c37-25e3f97bdaa7","ccaf27aa-8803-4c52-bf95-62b9951cd26e","a5ade3f1-1bae-4f5a-8187-a70e00406d3a"],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":null,"byteCount":null,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"fcb4afc1-0e23-49b0-a172-564c89bf10e0","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r2","attemptId":"r2:a1","toolCallId":null,"producerSeq":13,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.384Z","parentEventIds":[],"sourceCategory":"unattributed","sourceAlias":"provider_payload","sourcePath":null,"sourceKey":"39dc3a3104eeffca99785060a9da2b3f","contentVersionKey":"cv_f8deb43214095b54eb54fd10414d1ce5","sourceRange":null,"encoding":"json","observation":"dispatch","evidence":"final_dispatch","adapterId":"pi","adapterVersion":"0.85.1-observer-s3","boundary":"before_provider_request.final","handlerOrdinal":0,"coverage":"full","requestSpan":null,"sourceSpan":null,"matchMethod":"sha256:687c75e4e79b203a","ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":24,"byteCount":95,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"73f2e8b0-f9a3-4769-a9fc-91e78edd4ec1","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r2","attemptId":"r2:a1","toolCallId":null,"producerSeq":14,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.384Z","parentEventIds":["b76cbc94-bc9f-4a4b-b01e-a99177ce6c61","fcb4afc1-0e23-49b0-a172-564c89bf10e0"],"sourceCategory":"summary","sourceAlias":"Compaction summary","sourcePath":null,"sourceKey":"2c9618ee06b3d76df82adf54c0d80d1b","contentVersionKey":"cv_3409eee60be71eee0735c0ac36f74ec6","sourceRange":null,"encoding":"utf8","observation":"inclusion","evidence":"final_dispatch","adapterId":"pi","adapterVersion":"0.85.1-observer-s3","boundary":"before_provider_request.final","handlerOrdinal":null,"coverage":"full","requestSpan":{"start":0,"end":50},"sourceSpan":{"start":0,"end":50},"matchMethod":"exact_utf8_text_field:/messages/0/content","ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":null,"byteCount":null,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"e11a16e9-43c6-42fd-bdec-49e4bfc16bc3","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r2","attemptId":"r2:a1","toolCallId":null,"producerSeq":15,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.384Z","parentEventIds":["fcb4afc1-0e23-49b0-a172-564c89bf10e0"],"sourceCategory":"model_output","sourceAlias":"Assistant response","sourcePath":null,"sourceKey":null,"contentVersionKey":"cv_cc25719b7e203705297da162666b3609","sourceRange":null,"encoding":null,"observation":"response","evidence":"runtime_loaded","adapterId":"fixture","adapterVersion":"graph-v1","boundary":"message_end.assistant","handlerOrdinal":null,"coverage":"partial","requestSpan":null,"sourceSpan":null,"matchMethod":null,"ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":null,"byteCount":28,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"74ee8dca-f33f-4cf6-ad0e-9c88aa6d6018","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r3","attemptId":"r3:a1","toolCallId":null,"producerSeq":16,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.385Z","parentEventIds":[],"sourceCategory":"file_input","sourceAlias":"sample.ts · excerpt v2","sourcePath":null,"sourceKey":"6a05c12e0f27100eda69b8235adf1d71","contentVersionKey":"cv_62ea756278848245d76004e589789b15","sourceRange":null,"encoding":null,"observation":"read","evidence":"read_result","adapterId":"fixture","adapterVersion":"graph-v1","boundary":"fixture.input","handlerOrdinal":null,"coverage":"full","requestSpan":null,"sourceSpan":null,"matchMethod":null,"ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":4,"byteCount":13,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"5cb11cb8-4bd0-42a4-a3f3-ba837522e14e","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r3","attemptId":"r3:a2","toolCallId":null,"producerSeq":17,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.385Z","parentEventIds":[],"sourceCategory":"unattributed","sourceAlias":"provider_payload","sourcePath":null,"sourceKey":"a8eaec7137d474f2507666e9b8fcbf1a","contentVersionKey":"cv_b6dda1f1723843350265c336eceb26ff","sourceRange":null,"encoding":"json","observation":"payload","evidence":"payload_snapshot","adapterId":"pi","adapterVersion":"0.85.1-observer-s3","boundary":"before_provider_request.provisional","handlerOrdinal":0,"coverage":"partial","requestSpan":null,"sourceSpan":null,"matchMethod":"sha256:5e4ce7b36ba37b78","ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":4,"byteCount":15,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"22001ff9-e088-4e18-a26b-3cda61516ccf","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r3","attemptId":"r3:a2","toolCallId":null,"producerSeq":18,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.385Z","parentEventIds":["missing-observation"],"sourceCategory":null,"sourceAlias":null,"sourcePath":null,"sourceKey":null,"contentVersionKey":null,"sourceRange":null,"encoding":null,"observation":"capture_health","evidence":"unknown","adapterId":"fixture","adapterVersion":"graph-v1","boundary":"fixture.capture_loss","handlerOrdinal":null,"coverage":"partial","requestSpan":null,"sourceSpan":null,"matchMethod":null,"ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":null,"usageCachedTokens":null,"estimatedTokens":null,"byteCount":null,"charCount":null,"droppedEvents":2,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null},{"schemaVersion":"iseeagents.context.v1","eventId":"100be781-528c-4ebe-b11d-ded84ce32082","sessionId":"synthetic-graph-demo","agentId":"agent-main","parentAgentId":null,"requestId":"r3","attemptId":"r3:a2","toolCallId":null,"producerSeq":19,"monotonicMs":null,"wallTime":"2026-09-12T01:23:24.385Z","parentEventIds":[],"sourceCategory":null,"sourceAlias":null,"sourcePath":null,"sourceKey":null,"contentVersionKey":null,"sourceRange":null,"encoding":null,"observation":"usage","evidence":"final_dispatch","adapterId":"pi","adapterVersion":"0.85.1-observer-s3","boundary":"provider_usage","handlerOrdinal":null,"coverage":"partial","requestSpan":null,"sourceSpan":null,"matchMethod":null,"ambiguity":null,"lineageEventIds":[],"usageInputTokens":null,"usageOutputTokens":9,"usageCachedTokens":null,"estimatedTokens":null,"byteCount":null,"charCount":null,"droppedEvents":null,"unsupportedBoundary":null,"truncation":null,"rawTextRedacted":true,"rawText":null}],"label":"Synthetic SessionGraph demo","sessiongraph":null,"sessiongraphMetrics":null,"sources":{"byEventId":{},"byPath":{},"missed":[]}}</script>
+<script>/** Derived activity tape from iseeagents.context.v1 events. No second storage stream. */
+const ACTIVITY_VERSION = "iseeagents.activity.v1";
+
+const LINE_METHODS = new Set(["runtime_line_range", "runtime_lines", "tool_line_range"]);
+
+function agentRuntime(adapterId) {
+  const a = String(adapterId || "").toLowerCase();
+  if (a === "pi") return "pi";
+  if (a.includes("claude")) return "claude_code";
+  if (a.includes("codex")) return "codex";
+  if (a.includes("cursor")) return "cursor_agent";
+  return "unknown";
+}
+
+function activityPhase(event) {
+  const obs = event.observation;
+  if (obs === "capture_health") return "health";
+  if (obs === "response") return "outcome";
+  if (obs === "payload" || obs === "dispatch") return "boundary";
+  if (obs === "usage") return null;
+  if (obs === "read" || obs === "transform" || obs === "inclusion") return "process";
+  if (obs === "load" || obs === "inventory") {
+    if (event.sourceCategory === "tool_result") return "process";
+    if (/(?:^|[._])tool(?:[._]|$)/.test(String(event.boundary || ""))) return "process";
+    return "input";
+  }
+  return "health";
+}
+
+/** Line ranges only when matchMethod says so; otherwise bytes or unknown. Never invent lines. */
+function activityRange(event) {
+  const r = event.sourceRange;
+  if (!r || typeof r.start !== "number" || typeof r.end !== "number") return null;
+  const method = String(event.matchMethod || "");
+  if (LINE_METHODS.has(method) || method.includes("line_range")) {
+    return { start: r.start, end: r.end, unit: "line" };
+  }
+  return { start: r.start, end: r.end, unit: "byte" };
+}
+
+function basename(path) {
+  if (!path) return null;
+  const parts = String(path).split(/[/\\]/);
+  return parts[parts.length - 1] || path;
+}
+
+function formatRange(range) {
+  if (!range) return null;
+  if (range.unit === "line") return `L${range.start}–L${range.end}`;
+  return `bytes [${range.start}, ${range.end})`;
+}
+
+function activityTitle(event, phase, range) {
+  const alias = event.sourceAlias || event.sourceKey || event.boundary || event.observation;
+  const short = basename(alias) || alias;
+  const span = formatRange(range);
+  if (phase === "outcome") return "Assistant response";
+  if (phase === "boundary") return event.observation === "dispatch" ? "Provider dispatch" : "Provider request snapshot";
+  if (phase === "health") {
+    if (event.unsupportedBoundary) return `Capture gap: ${event.unsupportedBoundary}`;
+    if (event.boundary === "source_matching.eviction") return "Capture health: source matching eviction";
+    return event.sourceAlias ? `Capture health: ${short}` : `Capture health: ${event.boundary || "gap"}`;
+  }
+  if (phase === "process") {
+    const tool = event.toolCallId ? `tool ${event.toolCallId.slice(0, 8)}` : "tool/process";
+    if (span) return `${short}: ${span}`;
+    if (event.sourceAlias || event.sourceKey) return `${short} · range unknown`;
+    return `${tool} · ${event.boundary || event.observation}`;
+  }
+  // input
+  if (String(event.boundary || "").includes("prompt") || event.sourceCategory === "user_input") return "User input";
+  if (event.sourceCategory === "instructions" || String(event.boundary || "").includes("contextFiles")) {
+    const path = event.sourcePath || event.sourceAlias;
+    return `Instructions: ${basename(path) || path || "context"}`;
+  }
+  if (event.sourceCategory === "system_input" || String(event.boundary || "").includes("systemPrompt")) {
+    return "Assembled system prompt";
+  }
+  if (event.sourceCategory === "skill" || String(event.boundary || "").includes("skills")) {
+    return `Skill: ${event.sourceAlias || short}`;
+  }
+  if (event.sourceCategory === "file_input") {
+    return span ? `Load ${short} (${span})` : `Load ${short}`;
+  }
+  return short;
+}
+
+function pathFor(event) {
+  if (event.sourcePath) return event.sourcePath;
+  const fromNotes = typeof event.notes === "string" && event.notes.match(/(?:^|\n)sourcePath=([^\n]+)/);
+  if (fromNotes) return fromNotes[1].trim();
+  const alias = event.sourceAlias;
+  if (alias && (alias.includes("/") || alias.includes("\\") || /\.[a-z0-9]+$/i.test(alias))) return alias;
+  return event.sourceKey || null;
+}
+
+/**
+ * Project events → chronological ActivityStep[].
+ * Adds one derived health row per turn that has input/outcome but no payload/dispatch.
+ */
+function buildActivityTape(events) {
+  if (!Array.isArray(events) || events.length > 10000) throw new Error("Expected at most 10,000 context events");
+  const steps = [];
+  const byRequest = new Map();
+
+  for (const event of events) {
+    if (!event || event.schemaVersion !== "iseeagents.context.v1") continue;
+    const phase = activityPhase(event);
+    if (!phase) continue;
+    const range = activityRange(event);
+    const step = {
+      eventId: event.eventId,
+      seq: event.producerSeq,
+      wallTime: event.wallTime,
+      phase,
+      agentRuntime: agentRuntime(event.adapterId),
+      title: activityTitle(event, phase, range),
+      path: pathFor(event),
+      range,
+      toolName: event.toolCallId ? (event.sourceAlias || event.boundary || "tool") : null,
+      evidence: event.evidence,
+      requestId: event.requestId,
+      hasMessagePreview: Boolean(event.rawText),
+      coverage: event.coverage,
+      boundary: event.boundary,
+      adapterId: event.adapterId,
+      agentId: event.agentId,
+      attemptId: event.attemptId,
+      toolCallId: event.toolCallId,
+      matchMethod: event.matchMethod,
+      ambiguity: event.ambiguity,
+      parentEventIds: event.parentEventIds || [],
+      usageInputTokens: event.usageInputTokens,
+      usageOutputTokens: event.usageOutputTokens,
+      usageCachedTokens: event.usageCachedTokens,
+      unsupportedBoundary: event.unsupportedBoundary,
+      derived: false,
+      event,
+    };
+    steps.push(step);
+    const rid = event.requestId || "_none";
+    if (!byRequest.has(rid)) byRequest.set(rid, { hasBoundary: false, hasIO: false, maxSeq: 0, wallTime: event.wallTime, agentRuntime: step.agentRuntime, adapterId: event.adapterId, agentId: event.agentId });
+    const bucket = byRequest.get(rid);
+    if (phase === "boundary") bucket.hasBoundary = true;
+    if (phase === "input" || phase === "outcome" || phase === "process") bucket.hasIO = true;
+    if (event.producerSeq > bucket.maxSeq) { bucket.maxSeq = event.producerSeq; bucket.wallTime = event.wallTime; }
+  }
+
+  for (const [requestId, bucket] of byRequest) {
+    if (requestId === "_none") continue;
+    if (!bucket.hasIO || bucket.hasBoundary) continue;
+    const already = steps.some(s => s.requestId === requestId && s.phase === "health" && (
+      /no provider payload/i.test(s.title)
+      || s.unsupportedBoundary === "before_provider_request"
+      || s.boundary === "capture_health.missing_provider_payload"
+    ));
+    if (already) continue;
+    steps.push({
+      eventId: `derived:gap:${requestId}`,
+      seq: bucket.maxSeq + 0.5,
+      wallTime: bucket.wallTime,
+      phase: "health",
+      agentRuntime: bucket.agentRuntime,
+      title: "Capture gap: no provider payload snapshot",
+      path: null,
+      range: null,
+      toolName: null,
+      evidence: "unknown",
+      requestId,
+      hasMessagePreview: false,
+      coverage: "unsupported",
+      boundary: "capture_health.missing_provider_payload",
+      adapterId: bucket.adapterId,
+      agentId: bucket.agentId,
+      attemptId: null,
+      toolCallId: null,
+      matchMethod: null,
+      ambiguity: "Derived from absence of payload/dispatch for this turn",
+      parentEventIds: [],
+      usageInputTokens: null,
+      usageOutputTokens: null,
+      usageCachedTokens: null,
+      unsupportedBoundary: "before_provider_request",
+      derived: true,
+      event: null,
+    });
+  }
+
+  steps.sort((a, b) => {
+    if (a.seq !== b.seq) return a.seq - b.seq;
+    return String(a.wallTime).localeCompare(String(b.wallTime));
+  });
+
+  const turns = [];
+  const seen = new Set();
+  for (const step of steps) {
+    const id = step.requestId;
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    turns.push(id);
+  }
+
+  return {
+    version: ACTIVITY_VERSION,
+    steps,
+    turns,
+    counts: {
+      events: events.length,
+      steps: steps.length,
+      input: steps.filter(s => s.phase === "input").length,
+      process: steps.filter(s => s.phase === "process").length,
+      boundary: steps.filter(s => s.phase === "boundary").length,
+      outcome: steps.filter(s => s.phase === "outcome").length,
+      health: steps.filter(s => s.phase === "health").length,
+    },
+  };
+}
+
+/** Browser/Node shared graph projection. Never infer causality from event order. */
+const GRAPH_VERSION = "iseeagents.provenance.graph.v1";
+const observations = new Set(["inventory", "load", "read", "transform", "inclusion", "payload", "dispatch", "response", "usage", "capture_health"]);
+const categories = { user_input: "User input", system_input: "System input", instructions: "Instructions", file_input: "File input", tool_result: "Tool result", skill: "Skill", profile: "Profile", summary: "Summary", model_output: "Model response", other: "Runtime resource", history: "History", extension_generated: "Generated instruction", unattributed: "Unattributed" };
+function requestKey(e) { return JSON.stringify([e.sessionId, e.agentId, e.requestId, e.attemptId]); }
+
+function buildProvenanceGraph(events) {
+  if (!Array.isArray(events) || events.length > 10000) throw new Error("Expected at most 10,000 context events");
+  const byId = new Map(), nodes = [], edges = [], issues = [];
+  for (const e of events) {
+    if (!e || e.schemaVersion !== "iseeagents.context.v1" || typeof e.eventId !== "string" || !e.eventId
+        || typeof e.sessionId !== "string" || typeof e.agentId !== "string" || !observations.has(e.observation)
+        || !Array.isArray(e.parentEventIds) || !Array.isArray(e.lineageEventIds)
+        || e.parentEventIds.length + e.lineageEventIds.length > 1024
+        || [...e.parentEventIds, ...e.lineageEventIds].some(id => typeof id !== "string" || !id))
+      throw new Error("Invalid context event or unsupported observation");
+    if (byId.has(e.eventId)) throw new Error("Duplicate event ID; cannot join provenance safely");
+    byId.set(e.eventId, e);
+  }
+  const issue = (code, eventId, message) => issues.push({ code, eventId, message });
+  const edgeKeys = new Set();
+  function edge(from, to, kind, evidenceId) {
+    const a = byId.get(from), b = byId.get(to);
+    if (!a || !b) { issue("missing_parent", evidenceId, "Referenced event is absent: " + (!a ? from : to)); return; }
+    if (a.sessionId !== b.sessionId) { issue("cross_session_link", evidenceId, "Cross-session edge requires an explicit cross-session contract"); return; }
+    const key = JSON.stringify([from, to, kind, evidenceId]);
+    if (!edgeKeys.has(key)) { edges.push({ from, to, kind, evidenceId }); edgeKeys.add(key); }
+  }
+  for (const e of events) {
+    if (e.observation !== "inclusion") {
+      const kind = e.observation === "response" ? "response"
+        : ["payload", "dispatch"].includes(e.observation) ? "request"
+        : e.observation === "transform" ? "transform"
+        : ["usage", "capture_health"].includes(e.observation) ? "telemetry" : "source";
+      nodes.push({ id: e.eventId, kind, category: categories[e.sourceCategory] || e.sourceCategory || "Observation",
+        label: e.sourceAlias || (kind === "request" ? "Payload snapshot" : kind === "response" ? "Model response" : e.observation),
+        requestKey: requestKey(e), event: e });
+      for (const parent of new Set(e.parentEventIds)) {
+        const p = byId.get(parent);
+        const responseLink = e.observation === "response" && p && ["payload", "dispatch"].includes(p.observation);
+        if (responseLink && requestKey(p) !== requestKey(e)) {
+          issue("response_request_mismatch", e.eventId, "Response and parent have different request/attempt identities"); continue;
+        }
+        edge(parent, e.eventId, responseLink ? "response_to" : "recorded_parent", e.eventId);
+      }
+      for (const ancestor of new Set(e.lineageEventIds)) edge(ancestor, e.eventId, "summary_ancestor", e.eventId);
+    } else {
+      const [sourceId, payloadId] = e.parentEventIds;
+      const source = byId.get(sourceId), payload = byId.get(payloadId);
+      const range = r => r && Number.isSafeInteger(r.start) && Number.isSafeInteger(r.end) && r.start >= 0 && r.end > r.start;
+      if (e.parentEventIds.length !== 2 || !source || !payload || !["payload", "dispatch"].includes(payload.observation)
+          || !["inventory", "load", "read", "transform"].includes(source.observation)
+          || !source.contentVersionKey || e.contentVersionKey !== source.contentVersionKey
+          || e.sourceKey !== source.sourceKey || requestKey(e) !== requestKey(payload)
+          || source.agentId !== payload.agentId || !range(e.sourceSpan) || !range(e.requestSpan)
+          || !String(e.matchMethod || "").startsWith("exact_utf8_text_field:")
+          || e.evidence !== payload.evidence || !["payload_snapshot", "final_dispatch"].includes(e.evidence)) {
+        issue("unverified_match", e.eventId, "Source inclusion lacks matching version, spans or request evidence"); continue;
+      }
+      edge(sourceId, payloadId, "observed_text_match", e.eventId);
+    }
+    if (e.coverage !== "full" || e.truncation === true || (e.droppedEvents || 0) > 0)
+      issue("capture_gap", e.eventId, "Capture at this boundary is " + (e.coverage || "unknown"));
+  }
+  // Keep evidence-reference nodes out of the diagram. Incomplete links stay in issues.
+  const nodeIds = new Set(nodes.map(n => n.id));
+  for (const edge of edges) if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to))
+    issue("hidden_reference", edge.evidenceId, "A relationship references an inclusion evidence record; inspect the source log for the full chain");
+  const visibleEdges = edges.filter(e => nodeIds.has(e.from) && nodeIds.has(e.to));
+  const degrees = new Map(nodes.map(n => [n.id, 0])), outgoing = new Map();
+  for (const e of visibleEdges) { degrees.set(e.to, degrees.get(e.to) + 1); if (!outgoing.has(e.from)) outgoing.set(e.from, []); outgoing.get(e.from).push(e.to); }
+  const queue = [...degrees].filter(([, d]) => d === 0).map(([id]) => id);
+  for (let i = 0; i < queue.length; i++) for (const to of outgoing.get(queue[i]) || []) { degrees.set(to, degrees.get(to) - 1); if (degrees.get(to) === 0) queue.push(to); }
+  if (queue.length !== nodes.length) issue("cycle", null, "Recorded relationships contain a cycle; this is not a valid acyclic provenance graph");
+  // Matching the same payload span to multiple sources is ambiguous, not additive usage.
+  const spans = new Map();
+  for (const e of visibleEdges.filter(e => e.kind === "observed_text_match")) {
+    const m = byId.get(e.evidenceId), key = JSON.stringify([e.to, m.matchMethod, m.requestSpan]);
+    if (!spans.has(key)) spans.set(key, []); spans.get(key).push(e);
+  }
+  for (const group of spans.values()) if (group.length > 1)
+    for (const e of group) { e.ambiguous = true; issue("ambiguous_match", e.evidenceId, "The same request span matches multiple source observations; attribution is ambiguous"); }
+  return { schemaVersion: GRAPH_VERSION, nodes, edges: visibleEdges, issues,
+    requests: nodes.filter(n => n.kind === "request").map(n => ({ id: n.id, label: n.event.requestId || "Unidentified request", attempt: n.event.attemptId, key: n.requestKey })),
+    events };
+}
+
+function inspectRequest(graph, requestId) {
+  const request = graph.nodes.find(n => n.id === requestId && n.kind === "request");
+  if (!request) throw new Error("Select a recorded payload snapshot");
+  const matches = graph.edges.filter(e => e.to === requestId && e.kind === "observed_text_match");
+  const responses = graph.edges.filter(e => e.from === requestId && e.kind === "response_to").map(e => graph.nodes.find(n => n.id === e.to));
+  const ancestors = new Set(matches.map(e => e.from));
+  let changed = true;
+  while (changed) { changed = false; for (const edge of graph.edges) if (edge.kind === "summary_ancestor" && ancestors.has(edge.to) && !ancestors.has(edge.from)) { ancestors.add(edge.from); changed = true; } }
+  const candidates = graph.nodes.filter(n => ["source", "transform"].includes(n.kind)
+    && n.event.sessionId === request.event.sessionId && n.event.agentId === request.event.agentId);
+  const usage = graph.events.filter(e => e.observation === "usage" && requestKey(e) === request.requestKey);
+  return { request, matches, responses, ancestors: [...ancestors], candidates, usage,
+    unmatched: candidates.filter(n => !matches.some(e => e.from === n.id)),
+    outputStatus: responses.length ? "Response observed; semantic influence unknown" : "Output not recorded",
+    attention: "Model-internal processing and which inputs influenced the result are not observable here" };
+}
+
+(() => {
+  const $ = id => document.getElementById(id);
+  const initial = JSON.parse($("capture-data").textContent);
+  let data = initial, graph, view, selected, result = null, tape = null, selectedStepId = null, mode = "activity";
+  const buttons = new Map();
+  const rowButtons = new Map();
+  const element = (tag, text, className) => { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (className) e.className = className; return e; };
+  const relation = { observed_text_match: "text matched at captured boundary", summary_ancestor: "recorded summary ancestor", recorded_parent: "recorded parent (not inclusion proof)", response_to: "response associated with request" };
+  function setStatus(text) { $("load-status").textContent = text || ""; }
+  function resolveStepText(step) {
+    const ev = step?.event;
+    if (ev && typeof ev.rawText === "string" && ev.rawText.length) {
+      return { text: ev.rawText, source: "rawText", path: ev.sourcePath || step.path || null, truncated: false, bytes: ev.byteCount ?? ev.rawText.length };
+    }
+    const sources = data.sources;
+    if (!sources) return null;
+    const byId = sources.byEventId?.[step.eventId];
+    if (byId?.text) return { text: byId.text, source: "embed", path: byId.path || step.path || null, truncated: !!byId.truncated, bytes: byId.bytes };
+    const path = step.path || ev?.sourcePath || (typeof ev?.sourceAlias === "string" && ev.sourceAlias.includes("/") ? ev.sourceAlias : null);
+    if (path && sources.byPath?.[path]?.text) {
+      const hit = sources.byPath[path];
+      return { text: hit.text, source: "path", path, truncated: !!hit.truncated, bytes: hit.bytes };
+    }
+    return null;
+  }
+  function clock(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso).slice(11, 19) || iso;
+    return d.toISOString().slice(11, 19);
+  }
+  function turnIdsFromTape() {
+    return tape?.turns?.slice() || [];
+  }
+  function setMode(next) {
+    mode = next;
+    $("mode-activity").setAttribute("aria-pressed", String(next === "activity"));
+    $("mode-provenance").setAttribute("aria-pressed", String(next === "provenance"));
+    $("activity-view").hidden = next !== "activity";
+    $("provenance-view").hidden = next !== "provenance";
+    $("page-extras").hidden = next !== "provenance";
+    $("header-mode").textContent = next === "activity" ? "Activity tape · local only" : "Provenance inspector · local only";
+    if (next === "provenance") {
+      const picker = $("request-picker");
+      if (graph.requests.length) showRequest(picker.value || graph.requests[0].id);
+      else showInventory(picker.value || "");
+      requestAnimationFrame(drawEdges);
+    }
+  }
+  function fillPicker() {
+    $("request-picker").replaceChildren();
+    const all = element("option", "All turns");
+    all.value = "";
+    $("request-picker").append(all);
+    if (mode === "provenance" && graph.requests.length) {
+      for (const req of graph.requests) {
+        const node = graph.nodes.find(n => n.id === req.id);
+        const option = element("option", `${req.label} · ${req.attempt || "attempt unknown"} · ${node.event.evidence}`);
+        option.value = req.id;
+        $("request-picker").append(option);
+      }
+    } else {
+      for (const id of turnIdsFromTape()) {
+        const option = element("option", `Turn ${id}`);
+        option.value = id;
+        $("request-picker").append(option);
+      }
+    }
+  }
+  function load(next) {
+    const projected = buildProvenanceGraph(next.events);
+    graph = projected; data = next;
+    tape = buildActivityTape(next.events);
+    $("dataset-label").textContent = next.label || "Local recorded events";
+    $("error").hidden = true;
+    const c = tape.counts;
+    setStatus(`Loaded ${c.events} events → ${c.steps} activity steps · input ${c.input} · process ${c.process} · boundary ${c.boundary} · outcome ${c.outcome} · health ${c.health}`);
+    fillPicker();
+    $("issue-list").replaceChildren();
+    for (const i of graph.issues) $("issue-list").append(element("li", `${i.code}: ${i.message}${i.eventId ? ` [${i.eventId}]` : ""}`));
+    if (!graph.issues.length) $("issue-list").append(element("li", "No structural gap detected by these checks. Completeness is not certified."));
+    result = null; $("study-result").textContent = ""; $("download-result").hidden = true;
+    if (mode === "provenance") setMode("provenance");
+    else setMode("activity");
+    fillPicker();
+    renderActivity($("request-picker").value || "");
+  }
+  function filteredSteps(turn) {
+    return tape.steps.filter(s => !turn || s.requestId === turn);
+  }
+  function renderActivity(turn) {
+    const steps = filteredSteps(turn);
+    rowButtons.clear();
+    $("activity-list").replaceChildren();
+    $("activity-summary").textContent = turn
+      ? `${steps.length} steps in turn ${turn}`
+      : `${steps.length} steps · ${tape.turns.length} turn${tape.turns.length === 1 ? "" : "s"}`;
+    if (!steps.length) {
+      $("activity-list").append(element("li", "No activity steps in this filter.", "empty"));
+      clearDetail();
+      return;
+    }
+    for (const step of steps) {
+      const li = element("li");
+      const btn = element("button", undefined, "activity-row");
+      btn.type = "button";
+      btn.setAttribute("aria-pressed", "false");
+      btn.dataset.eventId = step.eventId;
+      btn.append(
+        element("span", clock(step.wallTime), "time"),
+        element("span", step.phase, `phase ${step.phase}`),
+        element("span", step.agentRuntime, "agent"),
+        element("span", step.title, "title"),
+        element("span", step.evidence, "evidence"),
+      );
+      btn.addEventListener("click", () => selectStep(step.eventId));
+      li.append(btn);
+      $("activity-list").append(li);
+      rowButtons.set(step.eventId, btn);
+    }
+    const prefer = selectedStepId && steps.some(s => s.eventId === selectedStepId)
+      ? selectedStepId
+      : (steps.find(s => s.phase === "outcome") || steps[steps.length - 1]).eventId;
+    selectStep(prefer);
+  }
+  function clearDetail() {
+    selectedStepId = null;
+    $("detail-title").textContent = "Select a step";
+    $("detail-phase").textContent = "";
+    $("detail-empty").hidden = false;
+    $("detail-sections").hidden = true;
+    $("detail-sections").replaceChildren();
+  }
+  function section(title, slot) {
+    const wrap = element("section", undefined, `detail-section slot-${slot}`);
+    wrap.append(element("h3", title));
+    return wrap;
+  }
+  function dl(pairs) {
+    const grid = element("dl", undefined, "details-grid");
+    for (const [label, value] of pairs) {
+      if (value == null || value === "") continue;
+      grid.append(element("dt", label), element("dd", String(value)));
+    }
+    return grid;
+  }
+  function selectStep(id) {
+    const step = tape.steps.find(s => s.eventId === id);
+    if (!step) return;
+    selectedStepId = id;
+    for (const [key, btn] of rowButtons) btn.setAttribute("aria-pressed", String(key === id));
+    $("detail-title").textContent = step.title;
+    $("detail-phase").textContent = `${step.agentRuntime} · ${clock(step.wallTime)}`;
+    $("detail-empty").hidden = true;
+    $("detail-sections").hidden = false;
+    const root = $("detail-sections");
+    root.replaceChildren();
+
+    const leadWrap = element("div", undefined, "detail-section slot-lead");
+    const lead = element("div", undefined, "detail-lead");
+    lead.append(element("span", step.phase, `badge ${step.phase}`));
+    lead.append(element("span", step.evidence));
+    if (step.requestId) lead.append(element("span", step.requestId));
+    leadWrap.append(lead);
+
+    const what = section("What", "what");
+    what.append(dl([
+      ["Agent", step.agentRuntime],
+      ["Adapter", `${step.adapterId}${step.event?.adapterVersion ? ` ${step.event.adapterVersion}` : ""}`],
+      ["Agent id", step.agentId],
+      ["Boundary", step.boundary],
+      ["Derived", step.derived ? "projected gap (not stored)" : "recorded event"],
+    ]));
+
+    const rangeLabel = step.range
+      ? (step.range.unit === "line"
+        ? `L${step.range.start}–L${step.range.end}`
+        : `bytes [${step.range.start}, ${step.range.end})`)
+      : "not recorded";
+    const where = section("Where", "where");
+    where.append(dl([
+      ["Path", step.path || "—"],
+      ["Span", rangeLabel],
+      ["Span rule", step.range?.unit === "line" ? "runtime lines only" : step.range ? "bytes — not attention" : "no span from adapter"],
+      ["Tool call", step.toolCallId || "—"],
+      ["Request", step.requestId || "unknown"],
+      ["Attempt", step.attemptId || "unknown"],
+    ]));
+
+    const message = section("Harness text", "message");
+    const resolved = resolveStepText(step);
+    if (resolved?.text) {
+      const meta = element("p", undefined, "notice");
+      meta.textContent = [
+        resolved.source === "rawText" ? "From capture" : resolved.source === "embed" ? "Embedded at HTML build" : "Embedded by path",
+        resolved.path ? `· ${resolved.path}` : "",
+        resolved.truncated ? "· truncated" : "",
+        `· ${resolved.bytes ?? resolved.text.length} bytes`,
+      ].filter(Boolean).join(" ");
+      message.append(meta);
+      const body = resolved.text.length > 12000
+        ? `${resolved.text.slice(0, 12000)}\n… truncated for display …`
+        : resolved.text;
+      message.append(element("pre", body, "message-box"));
+    } else if (step.phase === "input" && (step.path || step.event?.sourceCategory === "system_input")) {
+      message.append(element("p",
+        step.event?.sourceCategory === "system_input"
+          ? "Assembled system prompt was redacted at capture. Rebuild after ISEEAGENTS_PERSIST_HARNESS_TEXT=1, or enable that flag and /reload."
+          : `Path known${step.path ? ` (${step.path})` : ""}, but text was not embedded. Rebuild with: npm run graph -- CAPTURE.jsonl --out VIEW.html`,
+        "message-box"));
+    } else if (step.phase === "outcome") {
+      message.append(element("p",
+        step.event?.rawText
+          ? step.event.rawText
+          : "Assistant text omitted (default policy). Metadata only.",
+        "message-box"));
+    } else {
+      message.append(element("p",
+        step.hasMessagePreview
+          ? "Preview present under capture policy."
+          : "No harness text for this step.",
+        "message-box"));
+    }
+
+    const links = section("Links", "links");
+    const ul = element("ul", undefined, "links");
+    if (step.parentEventIds?.length) {
+      for (const pid of step.parentEventIds) ul.append(element("li", `parent → ${pid}`));
+    } else {
+      ul.append(element("li", "No parent links."));
+    }
+    ul.append(element("li", `Turn ${step.requestId || "none"} · association, not influence`));
+    if (step.phase === "boundary") ul.append(element("li", "Switch to Provenance for inclusion edges."));
+    links.append(ul);
+
+    const evidence = section("Evidence", "evidence");
+    evidence.append(dl([
+      ["Grade", step.evidence],
+      ["Coverage", step.coverage],
+      ["matchMethod", step.matchMethod || "—"],
+      ["Ambiguity", step.ambiguity || "—"],
+      ["Unsupported", step.unsupportedBoundary || "—"],
+      ["Event ID", step.eventId],
+    ]));
+
+    const usage = section("Usage", "usage");
+    const number = n => n == null ? "—" : String(n);
+    usage.append(dl([
+      ["Input", number(step.usageInputTokens)],
+      ["Cached", number(step.usageCachedTokens)],
+      ["Output", number(step.usageOutputTokens)],
+    ]));
+    usage.append(element("p", "Missing counters ≠ zero usage.", "notice"));
+
+    const sg = data.sessiongraph;
+    const sgSec = section("SessionGraph", "session");
+    const sgList = element("ul", undefined, "links");
+    if (!sg) sgList.append(element("li", "Not attached."));
+    else {
+      const nodeIds = new Set((sg.graph?.nodes || []).map(n => n.id));
+      const joined = graph.events.filter(e => nodeIds.has(e.eventId)).length;
+      sgList.append(element("li", `${joined}/${graph.events.length} eventIds joined · recorded structure only`));
+      appendStructuralMetrics(sgList);
+      for (const f of sg.findings || []) sgList.append(element("li", `${f.code}: ${f.summary}`));
+      if (!sg.findings?.length) sgList.append(element("li", "No findings."));
+    }
+    sgSec.append(sgList);
+
+    root.append(leadWrap, what, evidence, where, usage, message, links, sgSec);
+  }
+
+  function nodeButton(node) {
+    const matched = view?.matches?.some(e => e.from === node.id), ancestor = view?.ancestors?.includes(node.id);
+    const button = element("button", undefined, "node" + (matched ? " matched" : ancestor ? " ancestral" : ""));
+    button.type = "button"; button.setAttribute("aria-pressed", "false");
+    button.append(element("small", node.category), element("strong", node.label));
+    const status = node.kind === "source" || node.kind === "transform"
+      ? matched ? "Matched to this captured snapshot" : ancestor ? "Summary ancestor · not a direct match" : "Observed in session · inclusion unproven"
+      : node.kind === "request" ? node.event.evidence === "final_dispatch" ? "Producer-declared final capture" : "Snapshot only · later changes possible"
+      : "Response observed · raw text omitted";
+    button.append(element("small", status));
+    button.addEventListener("click", () => selectNode(node.id)); buttons.set(node.id, button); return button;
+  }
+  function showRequest(id) {
+    view = inspectRequest(graph, id); buttons.clear();
+    for (const part of ["source", "transform", "request", "response"]) $(`${part}-nodes`).replaceChildren();
+    for (const node of view.candidates.filter(n => n.kind === "source")) $("source-nodes").append(nodeButton(node));
+    for (const node of view.candidates.filter(n => n.kind === "transform" && view.ancestors.includes(n.id))) $("transform-nodes").append(nodeButton(node));
+    $("request-nodes").append(nodeButton(view.request));
+    for (const node of view.responses) $("response-nodes").append(nodeButton(node));
+    if (!$("source-nodes").children.length) $("source-nodes").append(element("div", "No source observations recorded", "empty-node"));
+    if (!$("transform-nodes").children.length) $("transform-nodes").append(element("div", "No linked transformation recorded", "empty-node"));
+    if (!view.responses.length) $("response-nodes").append(element("div", "Output not recorded. Usage counters do not provide the result text.", "empty-node"));
+    $("request-summary").textContent = `${view.matches.length} recorded match edge${view.matches.length === 1 ? "" : "s"} · ${view.request.event.boundary}`;
+    $("output-summary").textContent = view.outputStatus;
+    $("coverage-summary").textContent = `Payload coverage: ${view.request.event.coverage}. ${view.request.event.evidence === "final_dispatch" ? "The producer labels this capture final; this viewer does not independently verify transport." : "This snapshot may be changed by later handlers before dispatch."} Unlinked inputs are other observations in this session, not proof of inclusion or omission.`;
+    $("usage-list").replaceChildren();
+    const number = n => n == null ? "unknown" : String(n);
+    for (const e of view.usage) $("usage-list").append(element("li", `${e.boundary}: input ${number(e.usageInputTokens)}, cached ${number(e.usageCachedTokens)}, output ${number(e.usageOutputTokens)}. Counter scope is supplied by the adapter.`));
+    if (!view.usage.length) $("usage-list").append(element("li", "No usage record associated with this request identity."));
+    fillSessiongraphFindings();
+    selectNode(id); requestAnimationFrame(drawEdges);
+  }
+  function fillSessiongraphFindings() {
+    $("sessiongraph-findings").replaceChildren();
+    const sg = data.sessiongraph;
+    if (!sg) $("sessiongraph-findings").append(element("li", "No SessionGraph analysis attached. Provenance checks above are local."));
+    else {
+      const nodeIds = new Set((sg.graph?.nodes || []).map(n => n.id));
+      const joined = graph.events.filter(e => nodeIds.has(e.eventId)).length;
+      $("sessiongraph-findings").append(element("li", `${joined}/${graph.events.length} event IDs joined. SessionGraph findings concern graph/session health, not semantic influence.`));
+      appendStructuralMetrics($("sessiongraph-findings"));
+      for (const f of sg.findings || []) $("sessiongraph-findings").append(element("li", `${f.code}: ${f.summary}`));
+      if (!sg.findings?.length) $("sessiongraph-findings").append(element("li", "No SessionGraph finding; this does not prove capture completeness."));
+    }
+  }
+  function appendStructuralMetrics(list) {
+    const report = data.sessiongraphMetrics, m = report?.metrics;
+    if (!m) {
+      list.append(element("li", "No NetworkX structural metrics attached."));
+      return;
+    }
+    const value = n => n == null ? "unknown" : String(n);
+    const percent = n => typeof n === "number" ? `${Math.round(n * 100)}%` : "not measured";
+    list.append(element("li", `Structure: ${value(m.declared_nodes)} nodes, ${value(m.edges)} edges, ${value(m.weakly_connected_components)} component(s), depth ${value(m.max_depth)}.`));
+    list.append(element("li", `Cycles: ${value(m.cycle_nodes)} node(s); request→output coverage ${percent(m.request_output_coverage)}; changed-artifact verification ${percent(m.artifact_verification_coverage)}.`));
+    const relations = Object.entries(m.relation_counts || {}).map(([name, count]) => `${name} ${count}`).join(", ");
+    if (relations) list.append(element("li", `Recorded relations: ${relations}.`));
+    list.append(element("li", "These measurements describe recorded provenance structure; they do not establish correctness, attention, or semantic influence."));
+  }
+  function selectNode(id) {
+    selected = id; const node = graph.nodes.find(n => n.id === id); if (!node) return;
+    for (const [key, button] of buttons) button.setAttribute("aria-pressed", String(key === id));
+    $("prov-detail-title").textContent = node.label;
+    $("node-detail").replaceChildren();
+    const e = node.event;
+    for (const [label, value] of [["Observation", e.observation], ["Evidence", e.evidence], ["Coverage", e.coverage], ["Boundary", e.boundary], ["Request / attempt", `${e.requestId || "unknown"} / ${e.attemptId || "unknown"}`], ["Adapter", `${e.adapterId} ${e.adapterVersion || ""}`], ["Source version", e.contentVersionKey || "not recorded"], ["Source estimate", e.estimatedTokens == null ? "unknown" : `${e.estimatedTokens} tokens (not request allocation)`], ["Event ID", e.eventId]]) {
+      $("node-detail").append(element("dt", label), element("dd", String(value)));
+    }
+    $("edge-list").replaceChildren();
+    for (const edge of graph.edges.filter(edge => edge.from === id || edge.to === id)) {
+      const from = graph.nodes.find(n => n.id === edge.from), to = graph.nodes.find(n => n.id === edge.to);
+      const evidence = graph.events.find(e => e.eventId === edge.evidenceId);
+      const label = node => `${node.label} [${node.event.requestId || "request unknown"}; ${node.event.attemptId || "attempt unknown"}]`;
+      let text = `${label(from)} → ${label(to)}: ${relation[edge.kind]}.`;
+      if (edge.kind === "observed_text_match") text += ` ${evidence.matchMethod}; source bytes [${evidence.sourceSpan.start}, ${evidence.sourceSpan.end}), field bytes [${evidence.requestSpan.start}, ${evidence.requestSpan.end}).${edge.ambiguous ? " Ambiguous: another source matches this span." : ""}`;
+      text += ` Evidence: ${edge.evidenceId}`;
+      $("edge-list").append(element("li", text));
+    }
+    if (!$("edge-list").children.length) $("edge-list").append(element("li", "No recorded relationship. Position and timestamp do not establish input consumption."));
+  }
+  function showInventory(filterValue) {
+    const turn = filterValue.startsWith("turn:") ? filterValue.slice(5) : filterValue;
+    buttons.clear();
+    for (const part of ["source", "transform", "request", "response"]) $(`${part}-nodes`).replaceChildren();
+    const inTurn = n => !turn || n.event.requestId === turn;
+    const sources = graph.nodes.filter(n => n.kind === "source" && inTurn(n));
+    const transforms = graph.nodes.filter(n => n.kind === "transform" && inTurn(n));
+    const responses = graph.nodes.filter(n => n.kind === "response" && inTurn(n));
+    view = { matches: [], ancestors: [], request: null, responses, candidates: sources, usage: [], outputStatus: responses.length ? "Response observed; no payload snapshot to join" : "Output not recorded", unmatched: sources };
+    for (const node of sources.slice(0, 80)) $("source-nodes").append(nodeButton(node));
+    if (sources.length > 80) $("source-nodes").append(element("div", `Showing 80 of ${sources.length} source observations`, "empty-node"));
+    for (const node of transforms.slice(0, 40)) $("transform-nodes").append(nodeButton(node));
+    if (!sources.length) $("source-nodes").append(element("div", "No source observations recorded", "empty-node"));
+    if (!transforms.length) $("transform-nodes").append(element("div", "No linked transformation recorded", "empty-node"));
+    $("request-nodes").append(element("div", "No payload / dispatch snapshot in this capture. Observed loads and responses cannot prove what was sent to the model.", "empty-node"));
+    for (const node of responses) $("response-nodes").append(nodeButton(node));
+    if (!responses.length) $("response-nodes").append(element("div", "Output not recorded. Usage counters do not provide the result text.", "empty-node"));
+    $("request-summary").textContent = turn
+      ? `Inventory for turn ${turn}: ${sources.length} sources · ${responses.length} responses · 0 payload snapshots`
+      : `Inventory mode: ${sources.length} sources · ${responses.length} responses · 0 payload snapshots`;
+    $("output-summary").textContent = view.outputStatus;
+    $("coverage-summary").textContent = "File loaded successfully, but this capture has no payload_snapshot / final_dispatch events. Use Activity mode for the chronological tape; provenance inclusion edges need before_provider_request.";
+    $("usage-list").replaceChildren();
+    $("usage-list").append(element("li", "No usage record associated with a payload snapshot."));
+    fillSessiongraphFindings();
+    $("prov-detail-title").textContent = "Select an observed input or response";
+    $("node-detail").replaceChildren();
+    $("edge-list").replaceChildren();
+    $("edge-list").append(element("li", "No request-boundary edges without a payload snapshot."));
+    $("connections").replaceChildren();
+    if (sources[0]) selectNode(sources[0].id);
+    else if (responses[0]) selectNode(responses[0].id);
+  }
+  function drawEdges() {
+    $("connections").replaceChildren(); if (!view || window.innerWidth <= 780 || mode !== "provenance") return;
+    const board = $("graph-board").getBoundingClientRect();
+    $("connections").setAttribute("viewBox", `0 0 ${board.width} ${board.height}`);
+    for (const edge of graph.edges) {
+      if (!buttons.has(edge.from) || !buttons.has(edge.to)) continue;
+      const a = buttons.get(edge.from).getBoundingClientRect(), b = buttons.get(edge.to).getBoundingClientRect();
+      const x1 = a.right - board.left, y1 = (a.top + a.bottom) / 2 - board.top, x2 = b.left - board.left, y2 = (b.top + b.bottom) / 2 - board.top;
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", `M${x1},${y1} C${(x1+x2)/2},${y1} ${(x1+x2)/2},${y2} ${x2},${y2}`);
+      path.setAttribute("class", `connector ${edge.kind}`); $("connections").append(path);
+    }
+  }
+  $("mode-activity").addEventListener("click", () => { setMode("activity"); fillPicker(); renderActivity($("request-picker").value || ""); });
+  $("mode-provenance").addEventListener("click", () => { setMode("provenance"); fillPicker(); });
+  $("request-picker").addEventListener("change", e => {
+    const value = e.target.value;
+    if (mode === "activity") renderActivity(value);
+    else if (graph.requests.length) showRequest(value);
+    else showInventory(value);
+  });
+  async function readLocalFile(file) {
+    if (typeof file.text === "function") return file.text();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(reader.error || new Error("Could not read the selected file"));
+      reader.readAsText(file);
+    });
+  }
+  $("capture-file").addEventListener("change", async e => {
+    const file = e.target.files?.[0]; if (!file) return;
+    setStatus(`Reading ${file.name}…`);
+    try {
+      if (file.size > 8 * 1024 * 1024) throw new Error("Capture exceeds 8 MB local-view limit");
+      const text = await readLocalFile(file);
+      if (!text.trim()) throw new Error("Selected file is empty");
+      const events = text.trim().startsWith("[")
+        ? JSON.parse(text)
+        : text.split(/\r?\n/).filter(line => line.trim()).map((line, i) => {
+          try { return JSON.parse(line); }
+          catch (err) { throw new Error(`Invalid JSONL on line ${i + 1}: ${err.message}`); }
+        });
+      if (!Array.isArray(events) || !events.length) throw new Error("Capture contained no events");
+      load({ label: `Local capture: ${file.name}`, events });
+    } catch (error) {
+      $("error").textContent = error.message || String(error);
+      $("error").hidden = false;
+      setStatus(`Could not load ${file.name}`);
+    }
+  });
+  // Splitter drag
+  (() => {
+    const split = $("activity-view"), handle = $("splitter");
+    let dragging = false;
+    const onMove = ev => {
+      if (!dragging) return;
+      const rect = split.getBoundingClientRect();
+      const y = (ev.touches ? ev.touches[0].clientY : ev.clientY) - rect.top;
+      const pct = Math.min(75, Math.max(25, (y / rect.height) * 100));
+      split.style.gridTemplateRows = `minmax(120px, ${pct}%) 8px minmax(120px, ${100 - pct}%)`;
+    };
+    const stop = () => { dragging = false; };
+    handle.addEventListener("mousedown", () => { dragging = true; });
+    handle.addEventListener("touchstart", () => { dragging = true; }, { passive: true });
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("mouseup", stop);
+    window.addEventListener("touchend", stop);
+  })();
+  window.addEventListener("resize", drawEdges);
+  const questions = [
+    { id: "unlinked", prompt: "A file is visible but has no text-match edge to the selected request. What is supported?", answers: ["It was definitely sent", "The file was observed; inclusion is unproven", "The model ignored it"], correct: 1 },
+    { id: "boundary", prompt: "Text matches a provisional payload snapshot. What does that establish?", answers: ["It appeared at that capture boundary", "It definitely reached the provider unchanged", "It influenced the answer"], correct: 0 },
+    { id: "summary", prompt: "A summary has three ancestors and is matched to a resumed request. Are all originals also present?", answers: ["Yes, ancestry proves inclusion", "No, compaction always deletes originals", "Unknown without separate match evidence"], correct: 2 },
+    { id: "output", prompt: "Output tokens are reported, but no response event exists. Can we inspect the result?", answers: ["Yes, usage proves we captured the output", "No, output text was not recorded", "The request must have failed"], correct: 1 },
+    { id: "influence", prompt: "A source matches a request and a response is observed. Does this prove the source caused the answer?", answers: ["Yes", "Only if the session health is high", "No, semantic influence remains unknown"], correct: 2 },
+  ];
+  for (const question of questions) {
+    const field = element("fieldset"); field.append(element("legend", question.prompt));
+    question.answers.forEach((text, index) => { const label = element("label"), input = element("input"); input.type = "radio"; input.name = question.id; input.value = String(index); input.required = true; label.append(input, document.createTextNode(text)); field.append(label); });
+    $("questions").append(field);
+  }
+  $("study-form").addEventListener("submit", e => {
+    e.preventDefault(); const form = new FormData($("study-form"));
+    const answers = questions.map(q => ({ question: q.id, choice: form.get(q.id) === null ? null : Number(form.get(q.id)), correct: form.get(q.id) !== null && Number(form.get(q.id)) === q.correct }));
+    if (answers.some(a => a.choice === null)) { $("study-result").textContent = "Answer all five questions first."; return; }
+    result = { schema: "iseeagents.interpretation-check.v1", dataset: data.label, requestEventId: view?.request?.id ?? selectedStepId ?? null, timestamp: new Date().toISOString(), answers, correct: answers.filter(a => a.correct).length, total: questions.length, participant: "not collected" };
+    $("study-result").textContent = `${result.correct}/${result.total} correct in this local check. This is one response, not a population accuracy estimate.`;
+    $("download-result").hidden = false;
+  });
+  $("download-result").addEventListener("click", () => {
+    if (!result) return; const url = URL.createObjectURL(new Blob([JSON.stringify(result, null, 2)], { type: "application/json" }));
+    const link = element("a"); link.href = url; link.download = "iseeagents-interpretation-result.json"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+  load(data);
+})();
+</script>
+</body></html>

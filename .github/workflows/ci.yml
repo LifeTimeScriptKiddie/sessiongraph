@@ -6,7 +6,31 @@ on:
   pull_request:
 
 jobs:
-  test:
+  monorepo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+      - name: Install locked Node workspace
+        run: npm ci --ignore-scripts
+      - name: TypeScript tests
+        run: npm test
+      - name: Public source privacy checks
+        run: |
+          python3 scripts/test_public_source.py
+          npm run check:public
+      - name: SessionGraph tests
+        run: uv --directory packages/sessiongraph run --extra dev --frozen python -m unittest discover -s tests -q
+      - name: Cross-language contract
+        run: npm run test:integration
+
+  sessiongraph:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -18,11 +42,10 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install
-        run: python -m pip install -e ".[dev]"
+      - uses: astral-sh/setup-uv@v6
       - name: Unit tests
-        run: python -m unittest discover -s tests -v
+        run: uv --directory packages/sessiongraph run --extra dev --frozen python -m unittest discover -s tests -q
       - name: Compile check
-        run: python -m compileall -q src tests
+        run: uv --directory packages/sessiongraph run --extra dev --frozen python -m compileall -q src tests
       - name: Build distributions
-        run: python -m build
+        run: uv --directory packages/sessiongraph run --extra dev --frozen python -m build --no-isolation
