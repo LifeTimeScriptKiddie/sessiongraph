@@ -76,5 +76,7 @@ def write_interactive_html(analysis: dict[str, Any], destination: Path) -> Path:
     """)
     destination = destination.resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
-    network.write_html(str(destination), open_browser=False, notebook=False)
+    # PyVis write_html uses the platform default encoding (cp1252 on Windows).
+    # Its inline assets contain Unicode, so write the generated page as UTF-8.
+    destination.write_text(network.generate_html(notebook=False), encoding="utf-8")
     return destination
