@@ -7,7 +7,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { writeProvenanceHtml } from "../../../src/viewer/render.ts";
 
 const execFileAsync = promisify(execFile);
-const analyzerRoot = resolve(dirname(realpathSync(fileURLToPath(import.meta.url))), "..");
+const extensionPath = realpathSync(fileURLToPath(import.meta.url));
+const analyzerRoot = resolve(dirname(extensionPath), extensionPath.endsWith(".js") ? "../../../../packages/sessiongraph" : "..");
 const HELP = [
   "/sessiongraph — choose an action",
   "/sessiongraph open — build and open this session's activity/provenance graph (no Python needed)",

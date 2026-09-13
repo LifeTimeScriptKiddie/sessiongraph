@@ -1,27 +1,29 @@
 {
-  "name": "sessiongraph-workbench",
-  "version": "0.2.0",
-  "private": true,
+  "name": "@lifetimescriptkiddie/sessiongraph",
+  "version": "0.2.1",
   "type": "module",
-  "description": "Local-first agent session analysis and recorded context provenance",
+  "description": "Local session analysis, activity timelines and recorded context provenance for Pi",
   "exports": {
-    ".": "./src/index.ts",
-    "./schema": "./src/schema.ts",
-    "./recorder": "./src/recorder.ts",
-    "./index/sqlite": "./src/index/sqlite.ts",
-    "./sessiongraph": "./src/sessiongraph/export.ts",
-    "./adapters/claude": "./src/adapters/claude.ts",
-    "./adapters/codex": "./src/adapters/codex.ts",
-    "./adapters/pi": "./src/adapters/pi.ts"
+    ".": "./dist/src/index.js",
+    "./schema": "./dist/src/schema.js",
+    "./recorder": "./dist/src/recorder.js",
+    "./index/sqlite": "./dist/src/index/sqlite.js",
+    "./sessiongraph": "./dist/src/sessiongraph/export.js",
+    "./adapters/claude": "./dist/src/adapters/claude.js",
+    "./adapters/codex": "./dist/src/adapters/codex.js",
+    "./adapters/pi": "./dist/src/adapters/pi.js"
   },
   "scripts": {
-    "graph": "node --experimental-strip-types src/cli-graph.ts",
-    "ingest:codex": "node --experimental-strip-types src/cli-ingest-codex.ts",
-    "export:sessiongraph": "node --experimental-strip-types src/cli-export-sessiongraph.ts",
-    "test": "node --test --experimental-strip-types tests/*.test.ts",
+    "graph": "node dist/src/cli-graph.js",
+    "ingest:codex": "node dist/src/cli-ingest-codex.js",
+    "export:sessiongraph": "node dist/src/cli-export-sessiongraph.js",
+    "test": "npm run build && node --test --experimental-strip-types tests/*.test.ts",
     "test:integration": "node --experimental-strip-types scripts/test-sessiongraph-integration.ts",
-    "demo": "node --experimental-strip-types scripts/create-public-demo.ts",
-    "check:public": "python3 scripts/check-public-source.py"
+    "demo": "node dist/scripts/create-public-demo.js",
+    "check:public": "python3 scripts/check-public-source.py",
+    "build": "node scripts/build-npm.mjs",
+    "prepare": "npm run build",
+    "prepack": "npm run build"
   },
   "engines": {
     "node": ">=24"
@@ -29,8 +31,48 @@
   "license": "MIT",
   "pi": {
     "extensions": [
-      "./extensions/pi/iseeagents-observer.ts",
-      "./packages/sessiongraph/pi-extension/sessiongraph.ts"
+      "./dist/extensions/pi/iseeagents-observer.js",
+      "./dist/packages/sessiongraph/pi-extension/sessiongraph.js"
     ]
-  }
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "sessiongraph",
+    "observability",
+    "provenance",
+    "local-first"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LifeTimeScriptKiddie/sessiongraph.git"
+  },
+  "homepage": "https://github.com/LifeTimeScriptKiddie/sessiongraph#readme",
+  "bugs": {
+    "url": "https://github.com/LifeTimeScriptKiddie/sessiongraph/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    }
+  },
+  "files": [
+    "packages/sessiongraph/src/",
+    "packages/sessiongraph/pyproject.toml",
+    "packages/sessiongraph/uv.lock",
+    "packages/sessiongraph/README.md",
+    "packages/sessiongraph/LICENSE",
+    "packages/sessiongraph/PRIVACY.md",
+    "packages/sessiongraph/docs/",
+    "docs/",
+    "PRIVACY.md",
+    "dist/",
+    "scripts/build-npm.mjs"
+  ]
 }

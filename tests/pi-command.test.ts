@@ -39,7 +39,7 @@ it("Pi command builds current-session HTML without Python or raw source text", a
 });
 it("Pi manifest exposes both recorder and command entry points", () => {
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
-  assert.deepEqual(pkg.pi.extensions, ["./extensions/pi/iseeagents-observer.ts", "./packages/sessiongraph/pi-extension/sessiongraph.ts"]);
+  assert.deepEqual(pkg.pi.extensions, ["./dist/extensions/pi/iseeagents-observer.js", "./dist/packages/sessiongraph/pi-extension/sessiongraph.js"]);
 });
 it("Pi status does not mistake a reserved session path for a saved session", async () => {
   const h = harness(false);
