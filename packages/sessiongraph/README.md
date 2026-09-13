@@ -196,7 +196,7 @@ synthetic and proves integration compatibility, not a real policy speedup.
 Install the complete Pi package so the command and recorder are available together:
 
 ```sh
-pi install git:github.com/LifeTimeScriptKiddie/sessiongraph
+pi install npm:@lifetimescriptkiddie/sessiongraph
 ```
 
 Start a new Pi session and use `/sessiongraph` for the menu. `/sessiongraph report`

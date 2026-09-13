@@ -1,4 +1,6 @@
-import { createHmac, createHash, randomUUID } from "node:crypto";
+import { createHmac, createHash, randomUUID, randomBytes } from "node:crypto";
+
+const ephemeralKey = randomBytes(32);
 
 export function newEventId(): string {
   return randomUUID();
@@ -8,7 +10,7 @@ export function hmacKeyFromEnv(env: NodeJS.ProcessEnv = process.env): Buffer {
   const raw = env.ISEEAGENTS_HMAC_KEY;
   if (!raw) {
     // Ephemeral per-process key when unset — identifiers stay local-session only.
-    return createHash("sha256").update(`iseeagents-ephemeral:${process.pid}`).digest();
+    return Buffer.from(ephemeralKey);
   }
   return createHash("sha256").update(raw).digest();
 }

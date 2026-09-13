@@ -15,6 +15,7 @@ no npm dependency installation or account is needed.
 ```sh
 git clone https://github.com/LifeTimeScriptKiddie/sessiongraph.git
 cd sessiongraph
+npm run build
 npm run demo
 ```
 
@@ -28,7 +29,7 @@ to inspect recorded relationships, missing observations, and request/response li
 Install the package and start a new Pi session (Node.js 24+):
 
 ```sh
-pi install git:github.com/LifeTimeScriptKiddie/sessiongraph
+pi install npm:@lifetimescriptkiddie/sessiongraph
 ```
 
 The package loads the recorder and `/sessiongraph` command together. Recording
@@ -54,8 +55,9 @@ without a capture can still be analyzed with `report`. Reports analyze Pi's nati
 log; the graph displays the recorder's context evidence. Both remain local and
 may contain private metadata. HTML omits raw text and local source-file reads.
 
-The package integration is tested against Pi 0.85.1. npm/catalog publication is
-separate from this Git installation route.
+The package integration is tested against Pi 0.85.1. The Pi peer dependency is optional in npm because Pi supplies its own runtime;
+this package does not install a second copy of Pi. Development scripts and tests
+require the Git checkout, while the npm package includes the runtime and synthetic demo.
 
 ## Analyze a session
 
