@@ -227,6 +227,10 @@ def analyze(session: Session) -> dict[str, Any]:
             "escalation_deferred", "warning", "Retrieval requires browser escalation",
             ["result"], "Check the recorded escalation requirement before treating this source as complete.",
         ))
+    if session.format == "memory-plane-v1":
+        from .memory_plane import memory_plane_findings
+
+        findings += memory_plane_findings(session.metadata)
     if dangling:
         findings.append(Finding(
             "dangling_edges", "info", f"Graph has {len(dangling)} events whose parent is absent",
@@ -250,7 +254,7 @@ def analyze(session: Session) -> dict[str, Any]:
             "merge_events": sum(len(_parents(event)) > 1 for event in events),
             "branches": len(branches), "tool_calls": sum(tool_counts.values()),
             "tool_counts": dict(tool_counts), "usage": dict(usage), "workflow_health": score,
-            **(session.metadata if session.format in {"retrieval-v1", "pipeline-v1"} else {}),
+            **(session.metadata if session.format in {"retrieval-v1", "pipeline-v1", "memory-plane-v1"} else {}),
             **({
                 "loop_iterations": max((event.metadata.get("iteration", 0) for event in events), default=0),
                 "loop_retries": sum(

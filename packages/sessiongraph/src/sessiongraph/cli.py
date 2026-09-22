@@ -12,6 +12,7 @@ from .scorecard import evaluate_scorecard, load_analysis_json
 from .parsers import discover_pi_sessions, load_session
 from .report import write_bundle
 from .retrieval import load_retrieval
+from .memory_plane import load_memory_plane
 from .pipeline import load_pipeline
 from .suggest import default_out_dir, suggest_workflow
 from .visualize import write_interactive_html
@@ -60,6 +61,12 @@ def _parser() -> argparse.ArgumentParser:
     pipeline_parser = sub.add_parser("analyze-pipeline", help="analyze declared stages and externally recorded checks")
     pipeline_parser.add_argument("session")
     pipeline_parser.add_argument("--out", default="sessiongraph-report")
+    memory_plane_parser = sub.add_parser(
+        "analyze-memory-plane",
+        help="analyze agentctl memory-plane usage export (sessiongraph.memory_plane.v1)",
+    )
+    memory_plane_parser.add_argument("session")
+    memory_plane_parser.add_argument("--out", default="sessiongraph-report")
     list_parser = sub.add_parser(
         "discover", aliases=["list-pi"], help="list local Pi session paths without reading content"
     )
@@ -136,9 +143,13 @@ def main(argv: list[str] | None = None) -> int:
             for path in discover_pi_sessions(args.root):
                 print(path)
             return 0
-        if args.command in {"analyze", "analyze-retrieval", "analyze-pipeline"}:
-            loader = {"analyze": load_session, "analyze-retrieval": load_retrieval,
-                      "analyze-pipeline": load_pipeline}[args.command]
+        if args.command in {"analyze", "analyze-retrieval", "analyze-pipeline", "analyze-memory-plane"}:
+            loader = {
+                "analyze": load_session,
+                "analyze-retrieval": load_retrieval,
+                "analyze-pipeline": load_pipeline,
+                "analyze-memory-plane": load_memory_plane,
+            }[args.command]
             session = loader(args.session)
             result = analyze(session)
             destination = Path(args.out).resolve()

@@ -64,6 +64,19 @@ def markdown(analysis: dict[str, Any]) -> str:
             f"- Contract satisfied: **{bool(metrics['pipeline_success'])}**; recorded stage time: {metrics['pipeline_duration_ms']} ms",
             "- Verdicts come from the supplied verifier record. SessionGraph does not execute checks or certify their truth.",
         ]
+    if session["format"] == "memory-plane-v1":
+        lines[4:4] = [
+            f"- Window: `{metrics.get('period_start')}` → `{metrics.get('period_end')}`; backend: `{metrics.get('backend')}`",
+            f"- Gatekeeper audit events: {metrics.get('audit_event_count', 0)}; unique users: {metrics.get('unique_users', 0)}",
+            f"- Turns: {metrics.get('turn_total', 0)} (abstain {metrics.get('turn_abstain', 0)}, "
+            f"rate {metrics.get('turn_abstain_rate', 0)}); context: {metrics.get('context_total', 0)}",
+            f"- Store: accepted {metrics.get('accepted_total', 0)}, proposed pending {metrics.get('proposed_pending_total', 0)}, "
+            f"checkpoints {metrics.get('checkpoints', 0)}",
+            "## Architecture recommendations",
+            "",
+            "Findings below are deterministic recommendations from exported usage; SessionGraph does not mutate agentctl state.",
+            "",
+        ]
     if not analysis["findings"]:
         lines.append("No deterministic loop or dead-end signals were detected.")
     for finding in analysis["findings"]:
