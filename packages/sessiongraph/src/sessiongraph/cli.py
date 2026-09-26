@@ -16,6 +16,9 @@ from .memory_plane import load_memory_plane
 from .pipeline import load_pipeline
 from .suggest import default_out_dir, suggest_workflow
 from .visualize import write_interactive_html
+from .workflows import mine, read_claude_code, read_generic, request_rows
+from .worth_it import compare as compare_workflows, judge
+from .workflow_view import page_html, summary_markdown
 
 
 LOOP_RUN_YAML = """runId: sessiongraph-workflow-improvement
@@ -133,12 +136,72 @@ def _parser() -> argparse.ArgumentParser:
     )
     visual_parser.add_argument("analysis", help="SessionGraph analysis.json")
     visual_parser.add_argument("--out", default="sessiongraph-graph.html", help="output HTML path")
+    wf_parser = sub.add_parser(
+        "workflows",
+        help="mine repeated workflows across sessions, judge whether each is worth engineering, and visualize them",
+    )
+    wf_parser.add_argument("--claude-code", metavar="DIR", help="Claude Code transcripts root (e.g. ~/.claude/projects)")
+    wf_parser.add_argument("--sessions", nargs="*", default=[], help="Pi, agentctl or generic JSONL sessions (one request each)")
+    wf_parser.add_argument("--since", help="only activity since: 7d, 24h, or an ISO date")
+    wf_parser.add_argument("--effort-evidence", help="an agentctl bench-effort result JSON, to size the lookup saving")
+    wf_parser.add_argument("--out", required=True, help="output directory (workflows.json, workflows.md, workflows.html)")
+    wf_parser.add_argument("--rows", action="store_true", help="also write per-request rows (content-free) to requests.json")
+    wfc_parser = sub.add_parser("workflows-compare", help="keep or roll back one workflow recommendation (before/after workflows.json)")
+    wfc_parser.add_argument("before")
+    wfc_parser.add_argument("after")
+    wfc_parser.add_argument("--recommendation", required=True, help="recommendation id from the before document")
     return parser
+
+
+def _since(value: str | None):
+    from datetime import datetime, timedelta, timezone
+    import re as _re
+
+    if not value:
+        return None
+    m = _re.fullmatch(r"(\d+)([mhd])", value.strip())
+    if m:
+        unit = {"m": "minutes", "h": "hours", "d": "days"}[m.group(2)]
+        return datetime.now(timezone.utc) - timedelta(**{unit: int(m.group(1))})
+    parsed = datetime.fromisoformat(value)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        if args.command == "workflows":
+            if not args.claude_code and not args.sessions:
+                raise ValueError("give --claude-code DIR and/or --sessions FILES")
+            since = _since(args.since)
+            requests = []
+            if args.claude_code:
+                requests += read_claude_code(args.claude_code, since)
+            if args.sessions:
+                requests += read_generic(args.sessions)
+            evidence = json.loads(Path(args.effort_evidence).read_text(encoding="utf-8")) if args.effort_evidence else None
+            if isinstance(evidence, dict) and "result" in evidence and "levels" not in evidence:
+                evidence = evidence["result"]
+            doc = judge(mine(requests), evidence)
+            destination = Path(args.out).resolve()
+            destination.mkdir(parents=True, exist_ok=True)
+            (destination / "workflows.json").write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+            (destination / "workflows.md").write_text(summary_markdown(doc), encoding="utf-8")
+            (destination / "workflows.html").write_text(page_html(doc), encoding="utf-8")
+            if args.rows:
+                (destination / "requests.json").write_text(json.dumps(request_rows(requests), indent=2) + "\n", encoding="utf-8")
+            print(f"{doc['gate']['headline']}. wrote {destination / 'workflows.html'}")
+            return 0
+        if args.command == "workflows-compare":
+            before = json.loads(Path(args.before).read_text(encoding="utf-8"))
+            after = json.loads(Path(args.after).read_text(encoding="utf-8"))
+            rec = next((f["recommendation"] for f in before.get("families", [])
+                        if (f.get("recommendation") or {}).get("id") == args.recommendation), None)
+            if rec is None:
+                raise ValueError(f"no recommendation '{args.recommendation}' in {args.before}")
+            result = compare_workflows(before, after, rec)
+            print(json.dumps(result, indent=2, sort_keys=True))
+            return 0 if result["pass"] else 1
         if args.command in {"discover", "list-pi"}:
             for path in discover_pi_sessions(args.root):
                 print(path)

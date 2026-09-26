@@ -74,6 +74,17 @@ The analyzer is also independently installable from `packages/sessiongraph/`.
 See the [analyzer guide](packages/sessiongraph/README.md) for comparison,
 scorecards, graph metrics, pipeline verification, and optional visualization.
 
+## Find repeated workflows (and whether to engineer them)
+
+`sessiongraph workflows` mines workflows across sessions (Claude Code transcripts, Pi, agentctl and generic JSONL). It reduces each request to phases (explore, edit, test, commit, …), groups repeated ones into families, and draws each family's graph with its typical path. For each family it says whether to **observe only**, apply a **cheap fix**, or **engineer it**, always with the reasons. All of it is content-free.
+
+```sh
+sessiongraph workflows --claude-code ~/.claude/projects --since 14d --out out/
+sessiongraph workflows-compare before/workflows.json after/workflows.json --recommendation <id>
+```
+
+See [docs/WORKFLOWS.md](docs/WORKFLOWS.md).
+
 ## Capture and inspect provenance
 
 ```sh
