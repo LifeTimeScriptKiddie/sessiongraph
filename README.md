@@ -1,7 +1,20 @@
 # SessionGraph
 
-A local-first workbench for inspecting coding-agent sessions: activity timelines,
-recorded context provenance, and workflow graph analysis in one repository.
+**Stop hand-debugging agent sessions.** When a coding agent loops on the same
+tool call, stalls in a dead end, or needs correcting three times, you usually find
+out by scrolling the transcript and guessing. SessionGraph reads the session log
+instead, points to the exact events where it went wrong, and drafts a guarded
+workflow that heads off the same failure on the next run.
+
+| You get | How |
+|---|---|
+| The failure points, by event | Detects repeated and alternating tool loops, dead ends, unrecovered errors, agent timeouts and user corrections; every finding cites event IDs |
+| A fix to try, not just a report | `sessiongraph suggest-workflow` turns the top findings into a workflow with guard steps for Claude Code, Pi or agentctl. You review it; nothing runs automatically |
+| Proof it helped | `workflows-compare` checks a before/after pair, so a recommendation is kept or rolled back on evidence |
+| Privacy by default | Runs locally and never calls a model or network service. Reports omit transcript and tool-argument content unless you pass `--include-content` |
+
+SessionGraph judges how a session *behaved*, not whether the agent's answer was
+correct or it picked the right model.
 
 The Python SessionGraph analyzer and TypeScript iseeagents recorder/viewer are
 included together. The event format keeps its `iseeagents.context.v1` name for
