@@ -98,6 +98,10 @@ sessiongraph workflows-compare before/workflows.json after/workflows.json --reco
 
 See [docs/WORKFLOWS.md](docs/WORKFLOWS.md).
 
+## Verify a detector before trusting it
+
+A finding is only as good as its detector. `sessiongraph label-corrections`, `label` and `verify-detectors` measure each detector's precision and recall against human labels (agent labels never count). See [docs/VERIFY.md](docs/VERIFY.md).
+
 ## Capture and inspect provenance
 
 ```sh

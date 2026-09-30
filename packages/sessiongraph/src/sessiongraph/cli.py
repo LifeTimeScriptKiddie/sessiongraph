@@ -150,7 +150,45 @@ def _parser() -> argparse.ArgumentParser:
     wfc_parser.add_argument("before")
     wfc_parser.add_argument("after")
     wfc_parser.add_argument("--recommendation", required=True, help="recommendation id from the before document")
+    lc_parser = sub.add_parser("label-corrections",
+                               help="write a content-free sheet of turns for a human to label (user-correction detectors)")
+    lc_parser.add_argument("--claude-code", metavar="DIR", required=True, help="Claude Code transcripts root")
+    lc_parser.add_argument("--since", help="only activity since: 7d, 24h, or an ISO date")
+    lc_parser.add_argument("--sample", type=int, default=40, help="unflagged human turns to sample for recall")
+    lc_parser.add_argument("--seed", type=int, default=7)
+    lc_parser.add_argument("--out", required=True, help="sheet path (JSONL)")
+    label_parser = sub.add_parser("label", help="label a sheet interactively; only labels typed at a terminal count")
+    label_parser.add_argument("sheet")
+    vd_parser = sub.add_parser("verify-detectors",
+                               help="precision and estimated recall per detector, from human labels only")
+    vd_parser.add_argument("sheet")
+    vd_parser.add_argument("--require", nargs="*", default=[], help="exit 0 only if these detectors are verified")
+    vd_parser.add_argument("--out", help="write the report JSON here")
     return parser
+
+
+def _label_interactively(path: str) -> int:
+    from .verify import read_sheet, turn_text, write_sheet
+
+    if not sys.stdin.isatty():
+        raise ValueError("label needs a terminal: labels must come from a human, not a pipe or an agent")
+    rows = read_sheet(path)
+    todo = [r for r in rows[1:] if r.get("labeled_by") != "human"]
+    print(rows[0]["question"])
+    print(f"{len(todo)} turn(s) to label. y = yes, n = no, s = skip, q = save and quit")
+    for index, row in enumerate(todo, 1):
+        fired = ", ".join(name for name, hit in row["flags"].items() if hit) or "none (recall sample)"
+        print(f"\n[{index}/{len(todo)}] author={row['author']} ({row['author_reason']}); flagged by: {fired}")
+        print(f"signals: {row['signals']}")
+        print(turn_text(row)[:800])
+        answer = input("correction? [y/n/s/q] ").strip().lower()
+        if answer == "q":
+            break
+        if answer in {"y", "n"}:
+            row["label"], row["labeled_by"] = answer == "y", "human"
+            write_sheet(path, rows)
+    write_sheet(path, rows)
+    return 0
 
 
 def _since(value: str | None):
@@ -202,6 +240,30 @@ def main(argv: list[str] | None = None) -> int:
             result = compare_workflows(before, after, rec)
             print(json.dumps(result, indent=2, sort_keys=True))
             return 0 if result["pass"] else 1
+        if args.command == "label-corrections":
+            from .verify import label_sheet, read_claude_turns, write_sheet
+
+            rows = label_sheet(read_claude_turns(args.claude_code, _since(args.since)), args.sample, args.seed)
+            write_sheet(args.out, rows)
+            head = rows[0]
+            print(f"{len(rows) - 1} turn(s) to label ({len(rows) - 1 - head['sample_size']} flagged, "
+                  f"{head['sample_size']} sampled for recall); authors {head['authors']}. "
+                  f"next: sessiongraph label {args.out}")
+            return 0
+        if args.command == "label":
+            return _label_interactively(args.sheet)
+        if args.command == "verify-detectors":
+            from .verify import read_sheet, verify
+
+            report = verify(read_sheet(args.sheet))
+            body = json.dumps(report, indent=2, sort_keys=True) + "\n"
+            if args.out:
+                Path(args.out).write_text(body, encoding="utf-8")
+            print(body, end="")
+            unknown = [name for name in args.require if name not in report["detectors"]]
+            if unknown:
+                raise ValueError(f"unknown detector(s): {', '.join(unknown)}")
+            return 0 if all(report["detectors"][name]["verdict"] == "verified" for name in args.require) else 1
         if args.command in {"discover", "list-pi"}:
             for path in discover_pi_sessions(args.root):
                 print(path)
