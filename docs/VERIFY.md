@@ -42,7 +42,7 @@ Classifier denials and safety interrupts do not count as a human stopping the ag
 
 ## Why labels must come from a human
 
-If an agent writes the ground truth, the agent is being trusted again. Only rows with `labeled_by: human` count; any other labels are reported as `ignored_non_human_labels`. `sessiongraph label` refuses to run without a terminal. That stops a pipe or an agent, but not someone editing the file by hand.
+If an agent writes the ground truth, the agent is being trusted again. Only rows with `labeled_by: human` count, plus rows that code settles as "no" because a human didn't type the turn (`labeled_by: code`). Any other labels, including a `code` label on a human turn, are reported as `ignored_non_human_labels`. `sessiongraph label` refuses to run without a terminal. That stops a pipe or an agent, but not someone editing the file by hand.
 
 ## Privacy
 

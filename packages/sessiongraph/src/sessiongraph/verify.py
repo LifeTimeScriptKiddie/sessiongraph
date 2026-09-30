@@ -3,7 +3,8 @@
 A detector is code that answers yes or no for one turn. Its answer is only
 passed on as a finding once human labels show it is right often enough:
 precision on the turns it flagged, and recall estimated from a random sample
-of turns it did not flag. Labels written by an agent never count.
+of turns it did not flag. Labels written by an agent never count; turns a
+human did not type are settled as "no" by code (`labeled_by: code`).
 
 This module verifies user-correction detectors over Claude Code transcripts:
 
@@ -160,6 +161,9 @@ def label_sheet(turns: list[Turn], sample: int = 40, seed: int = 7) -> list[dict
                "author_reason": turn.author_reason, "flags": flags,
                "signals": {"stopped_before": turn.stopped_before, "reverted_after": turn.reverted_after},
                "label": None, "labeled_by": None}
+        if turn.author != "human":
+            # a turn nobody typed cannot be a human correction: settled from recorded fields, not judged
+            row.update(label=False, labeled_by="code")
         if any(flags.values()):
             flagged.append({**row, "stratum": "flagged"})
         elif turn.author == "human":
@@ -199,8 +203,9 @@ def _rate(numerator: float, denominator: float) -> float | None:
 def verify(rows: list[dict[str, Any]], t: dict[str, float] = THRESHOLDS) -> dict[str, Any]:
     """Precision and estimated recall per detector, from human labels only."""
     header, body = rows[0], rows[1:]
-    human = [r for r in body if r.get("labeled_by") == "human" and isinstance(r.get("label"), bool)]
-    ignored = sum(r.get("label") is not None and r.get("labeled_by") != "human" for r in body)
+    human = [r for r in body if isinstance(r.get("label"), bool) and (
+        r.get("labeled_by") == "human" or (r.get("labeled_by") == "code" and r.get("author") != "human"))]
+    ignored = sum(r.get("label") is not None and r not in human for r in body)
     sample = [r for r in human if r["stratum"] == "sample"]
     sample_true_rate = sum(r["label"] for r in sample) / len(sample) if sample else None
     missed_unflagged = (sample_true_rate or 0) * header["unflagged_human"]
@@ -222,7 +227,9 @@ def verify(rows: list[dict[str, Any]], t: dict[str, float] = THRESHOLDS) -> dict
                          "precision": precision, "missed_in_flagged": missed_flagged,
                          "missed_estimated_unflagged": round(missed_unflagged, 1),
                          "recall_estimated": recall, "verdict": verdict}
-    return {"schema": REPORT_SCHEMA, "thresholds": t, "human_labels": len(human),
+    return {"schema": REPORT_SCHEMA, "thresholds": t,
+            "human_labels": sum(r["labeled_by"] == "human" for r in human),
+            "code_labels": sum(r["labeled_by"] == "code" for r in human),
             "ignored_non_human_labels": ignored,
             "unlabeled": sum(not isinstance(r.get("label"), bool) for r in body),
             "sample": {"labeled": len(sample), "true_rate": _rate(sum(r["label"] for r in sample), len(sample)),

@@ -84,6 +84,8 @@ class SheetTests(unittest.TestCase):
         self.assertEqual(rows[0]["schema"], SCHEMA)
         by_id = {r["turn_id"]: r for r in rows[1:]}
         self.assertEqual(by_id["a1"]["flags"], {"keyword_any_author": True, "keyword_human": False, "behavior": False})
+        self.assertEqual((by_id["a1"]["label"], by_id["a1"]["labeled_by"]), (False, "code"))
+        self.assertIsNone(by_id["h1"]["labeled_by"], "human turns are left for the human")
         self.assertTrue(by_id["h1"]["flags"]["keyword_human"])
         self.assertEqual(by_id["h2"]["stratum"], "sample")
 
@@ -94,8 +96,8 @@ class SheetTests(unittest.TestCase):
             self.assertEqual(main(["label", str(sheet)]), 2)
 
 
-def _row(flags, label, stratum="flagged", by="human"):
-    return {"flags": flags, "label": label, "labeled_by": by, "stratum": stratum}
+def _row(flags, label, stratum="flagged", by="human", author="human"):
+    return {"flags": flags, "label": label, "labeled_by": by, "stratum": stratum, "author": author}
 
 
 class VerifyTests(unittest.TestCase):
@@ -130,6 +132,13 @@ class VerifyTests(unittest.TestCase):
         report = verify(self._sheet([_row({"good": True, "noisy": True}, False, by="agent")] * 5))
         self.assertEqual(report["ignored_non_human_labels"], 5)
         self.assertEqual(report["detectors"]["good"]["precision"], 0.9)
+
+    def test_code_may_settle_only_non_human_turns(self):
+        report = verify(self._sheet([_row({"good": False, "noisy": True}, False, by="code", author="agent")] * 3
+                                    + [_row({"good": True, "noisy": True}, False, by="code")] * 4))
+        self.assertEqual((report["code_labels"], report["ignored_non_human_labels"]), (3, 4))
+        self.assertEqual(report["detectors"]["good"]["precision"], 0.9)
+        self.assertEqual(report["detectors"]["noisy"]["false_positives"], 24)
 
     def test_no_sample_labels_means_insufficient(self):
         rows = [r for r in self._sheet() if r.get("stratum") != "sample"]

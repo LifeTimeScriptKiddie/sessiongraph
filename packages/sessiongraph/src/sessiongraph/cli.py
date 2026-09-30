@@ -173,7 +173,7 @@ def _label_interactively(path: str) -> int:
     if not sys.stdin.isatty():
         raise ValueError("label needs a terminal: labels must come from a human, not a pipe or an agent")
     rows = read_sheet(path)
-    todo = [r for r in rows[1:] if r.get("labeled_by") != "human"]
+    todo = [r for r in rows[1:] if r.get("labeled_by") not in {"human", "code"}]
     print(rows[0]["question"])
     print(f"{len(todo)} turn(s) to label. y = yes, n = no, s = skip, q = save and quit")
     for index, row in enumerate(todo, 1):
