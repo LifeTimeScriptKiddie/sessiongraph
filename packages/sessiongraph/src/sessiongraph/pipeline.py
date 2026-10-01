@@ -1,6 +1,8 @@
 """Observe externally verified pipeline artifacts without executing their producer.
 
 Verdicts are supplied by a verifier, not inferred from prose or process success.
+A reported pass counts only when its evidence file exists and hashes to the
+recorded evidence_sha256; a pass without matching evidence is unproven.
 Fixture/verifier/contract digests permit matched comparisons, not proof of truth.
 Absolute input paths, commands, stage names and arbitrary content are not exported.
 """
@@ -29,8 +31,32 @@ def _digest(value):
     return value
 
 
-def load_pipeline(path: str | Path) -> Session:
+def _evidence(check, root: Path, expected: str) -> str:
+    """matched | mismatch | missing | unchecked, computed by hashing the referenced file."""
+    relative = check.get("evidence_path")
+    if relative is None:
+        return "unchecked"
+    if not isinstance(relative, str) or not relative or Path(relative).is_absolute():
+        raise ValueError("evidence_path must be a nonempty relative path")
+    target = (root / relative).resolve()
+    if not target.is_relative_to(root):
+        raise ValueError("evidence_path must stay inside the evidence directory")
+    if not target.is_file():
+        return "missing"
+    digest = hashlib.sha256()
+    read = 0
+    with target.open("rb") as handle:
+        while chunk := handle.read(1 << 20):
+            read += len(chunk)
+            if read > MAX_TOTAL_BYTES:
+                raise ValueError("evidence file exceeds total byte limit")
+            digest.update(chunk)
+    return "matched" if digest.hexdigest() == expected else "mismatch"
+
+
+def load_pipeline(path: str | Path, evidence_dir: str | Path | None = None) -> Session:
     source = Path(path).expanduser().resolve()
+    evidence_root = Path(evidence_dir).expanduser().resolve() if evidence_dir else source.parent
     with source.open("rb") as handle:
         body = handle.read(MAX_TOTAL_BYTES + 1)
     if len(body) > MAX_TOTAL_BYTES:
@@ -63,7 +89,8 @@ def load_pipeline(path: str | Path) -> Session:
     check_ids = {key: f"check-{index}" for index, key in enumerate(sorted(checks), 1)}
     events = [Event("run", None, "pipeline_start", name="run")]
     seen_stages, seen_checks = set(), set()
-    passed = failed = completed = timeouts = 0
+    passed = failed = proven = completed = timeouts = 0
+    evidence_counts = {"matched": 0, "mismatch": 0, "missing": 0, "unchecked": 0}
     durations = {}
     last_index = -1
     for stage in stages:
@@ -109,11 +136,14 @@ def load_pipeline(path: str | Path) -> Session:
             if type(ok) is not bool:
                 raise ValueError("pipeline check passed must be boolean")
             evidence = _digest(check.get("evidence_sha256"))
+            status = _evidence(check, evidence_root, evidence)
+            evidence_counts[status] += 1
             passed += ok
             failed += not ok
+            proven += ok and status == "matched"
             events.append(Event(check_ids[key], event_id, "pipeline_check", name=check_ids[key],
-                                signature=fingerprint(key), is_error=not ok,
-                                metadata={"passed": ok, "evidence_sha256": evidence}))
+                                signature=fingerprint(key), is_error=not (ok and status == "matched"),
+                                metadata={"passed": ok, "evidence_sha256": evidence, "evidence": status}))
     try:
         elapsed = sum(durations.values())
         valid_total = math.isfinite(elapsed)
@@ -123,9 +153,10 @@ def load_pipeline(path: str | Path) -> Session:
         raise ValueError("total pipeline duration exceeds numeric range")
     missing_checks = len(checks) - len(seen_checks)
     missing_stages = len(required) - len(seen_stages)
-    success = completed == len(required) and passed == len(checks)
+    reported = completed == len(required) and passed == len(checks)
+    success = completed == len(required) and proven == len(checks)
     events.append(Event("result", events[-1].id, "pipeline_result", name="result", is_error=not success,
-                        metadata={"reported_verification_success": success,
+                        metadata={"reported_verification_success": reported, "proven_verification_success": success,
                                   "missing_checks": missing_checks, "missing_stages": missing_stages}))
     return Session(source.stem, str(source), "pipeline-v1", events, metadata={
         "fixture_sha256": fixture, "verifier_sha256": verifier, "contract_sha256": contract,
@@ -133,6 +164,8 @@ def load_pipeline(path: str | Path) -> Session:
         "pipeline_stages_completed": completed, "pipeline_stages_missing": missing_stages,
         "pipeline_checks_required": len(checks), "pipeline_checks_passed": passed,
         "pipeline_checks_failed": failed, "pipeline_checks_missing": missing_checks,
+        "pipeline_checks_proven": proven, "pipeline_checks_unproven": passed - proven,
+        "pipeline_evidence": evidence_counts, "pipeline_reported_success": int(reported),
         "pipeline_timeouts": timeouts, "pipeline_duration_ms": elapsed,
         "pipeline_stage_duration_ms": durations, "pipeline_success": int(success),
     })

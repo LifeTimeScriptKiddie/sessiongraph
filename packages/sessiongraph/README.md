@@ -144,13 +144,20 @@ The JSON format is `schema: "sessiongraph.pipeline.v1"` with:
 - `required_checks`: nonempty object mapping each required check ID to its stage ID.
 - `stages`: recorded stages in declared order, each with `id`, `status`
   (`completed`, `failed`, `blocked`, `timeout`), finite nonnegative `duration_ms`,
-  and `checks`: objects containing `id`, boolean `passed`, and `evidence_sha256`.
+  and `checks`: objects containing `id`, boolean `passed`, `evidence_sha256`, and
+  `evidence_path` (relative to the record's folder, or to `--evidence-dir`).
 
-The adapter exports ordinal stage/check IDs and evidence hashes, not commands,
-targets, stage names or artifact contents. It does not read referenced evidence,
-run checks, or certify a verifier's claims. Metrics cover required/passed/failed/missing
-checks, completed/missing stages, timeouts and summed stage duration. Successful
-verification requires every declared stage completed and every required check passed.
+A reported pass is not taken on trust. SessionGraph hashes each check's evidence file
+and counts the pass only when the file exists and matches `evidence_sha256`; otherwise
+the check is unproven (`matched`, `mismatch`, `missing` or `unchecked` in
+`pipeline_evidence`) and an `evidence_unproven` finding is raised. It does not re-run
+checks: a match proves the evidence is the file the verifier hashed, not that the
+verdict is right. The adapter exports ordinal stage/check IDs, evidence hashes and
+evidence status, not commands, targets, stage names, evidence paths or artifact contents.
+Metrics cover required/passed/proven/unproven/failed/missing checks, completed/missing
+stages, timeouts and summed stage duration. `pipeline_success` requires every declared
+stage completed and every required check passed with matching evidence;
+`pipeline_reported_success` keeps the verifier's unchecked claim for comparison.
 Failed verification produces a `pipeline_contract` finding and a contract-preserving
 workflow suggestion. Suggestions never run automatically.
 

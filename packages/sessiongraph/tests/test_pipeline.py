@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 import unittest
 from pathlib import Path
@@ -19,10 +20,53 @@ class PipelineTests(unittest.TestCase):
                           {'id':'resume','status':'completed','duration_ms':20,
                            'checks':[{'id':'saved-state','passed':True,'evidence_sha256':'e'*64}]}]}
 
-    def result(self, payload):
+    def result(self, payload, evidence=None):
+        """Write each check's evidence file so its hash matches, unless the test overrides it."""
         with TemporaryDirectory() as directory:
-            path=Path(directory)/'pipeline.json'; path.write_text(json.dumps(payload))
+            root=Path(directory)
+            for stage in payload.get('stages',[]):
+                for check in stage.get('checks',[]) if isinstance(stage,dict) else []:
+                    if isinstance(check,dict) and isinstance(check.get('id'),str) and 'evidence_path' not in check:
+                        body=(evidence or {}).get(check['id'],f"evidence for {check['id']}").encode()
+                        (root/f"{check['id']}.txt").write_bytes(body)
+                        check['evidence_path']=f"{check['id']}.txt"
+                        if check.get('evidence_sha256') in {'d'*64,'e'*64}:
+                            check['evidence_sha256']=hashlib.sha256(f"evidence for {check['id']}".encode()).hexdigest()
+            path=root/'pipeline.json'; path.write_text(json.dumps(payload))
             return analyze(load_pipeline(path))
+
+    def test_pass_without_matching_evidence_is_unproven(self):
+        tampered=self.result(self.payload(),evidence={'exact-scope':'something else'})
+        self.assertEqual(tampered['metrics']['pipeline_checks_passed'],2)
+        self.assertEqual(tampered['metrics']['pipeline_checks_proven'],1)
+        self.assertEqual(tampered['metrics']['pipeline_evidence']['mismatch'],1)
+        self.assertEqual((tampered['metrics']['pipeline_success'],tampered['metrics']['pipeline_reported_success']),(0,1))
+        self.assertIn('evidence_unproven',{item['code'] for item in tampered['findings']})
+        for missing in [{'evidence_path':'absent.txt'},{}]:
+            payload=self.payload();payload['stages'][0]['checks'][0].update(missing)
+            if not missing: payload['stages'][0]['checks'][0]['evidence_path']=None
+            result=self.result(payload)
+            self.assertEqual(result['metrics']['pipeline_success'],0)
+            self.assertEqual(result['metrics']['pipeline_checks_unproven'],1)
+
+    def test_evidence_path_cannot_escape(self):
+        for bad in ['../outside.txt','/etc/hosts','']:
+            payload=self.payload();payload['stages'][0]['checks'][0]['evidence_path']=bad
+            with self.subTest(bad=bad),self.assertRaises(ValueError): self.result(payload)
+
+    def test_evidence_dir_flag(self):
+        with TemporaryDirectory() as directory:
+            root=Path(directory);(root/'ev').mkdir()
+            payload=self.payload()
+            for stage in payload['stages']:
+                for check in stage['checks']:
+                    body=f"proof {check['id']}".encode();(root/'ev'/f"{check['id']}.txt").write_bytes(body)
+                    check['evidence_path']=f"{check['id']}.txt";check['evidence_sha256']=hashlib.sha256(body).hexdigest()
+            path=root/'pipeline.json';path.write_text(json.dumps(payload));out=root/'out'
+            self.assertEqual(main(['analyze-pipeline',str(path),'--evidence-dir',str(root/'ev'),'--out',str(out)]),0)
+            metrics=json.loads((out/'analysis.json').read_text())['metrics']
+            self.assertEqual((metrics['pipeline_checks_proven'],metrics['pipeline_success']),(2,1))
+            self.assertNotIn('exact-scope.txt',(out/'analysis.json').read_text())
 
     def test_success_requires_completed_stages_and_all_checks(self):
         result=self.result(self.payload())

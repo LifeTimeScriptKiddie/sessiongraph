@@ -64,6 +64,7 @@ def _parser() -> argparse.ArgumentParser:
     pipeline_parser = sub.add_parser("analyze-pipeline", help="analyze declared stages and externally recorded checks")
     pipeline_parser.add_argument("session")
     pipeline_parser.add_argument("--out", default="sessiongraph-report")
+    pipeline_parser.add_argument("--evidence-dir", help="where evidence_path files live (default: the record's folder)")
     memory_plane_parser = sub.add_parser(
         "analyze-memory-plane",
         help="analyze agentctl memory-plane usage export (sessiongraph.memory_plane.v1)",
@@ -275,7 +276,8 @@ def main(argv: list[str] | None = None) -> int:
                 "analyze-pipeline": load_pipeline,
                 "analyze-memory-plane": load_memory_plane,
             }[args.command]
-            session = loader(args.session)
+            session = (load_pipeline(args.session, args.evidence_dir) if args.command == "analyze-pipeline"
+                       else loader(args.session))
             result = analyze(session)
             destination = Path(args.out).resolve()
             write_bundle(session, result, destination, getattr(args, "include_content", False))

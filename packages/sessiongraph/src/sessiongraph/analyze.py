@@ -215,6 +215,16 @@ def analyze(session: Session) -> dict[str, Any]:
             "Inspect failed or missing stage/check evidence; repair the producer while keeping the fixture, "
             "verifier and required checks fixed. A successful process exit is insufficient.",
         ))
+    if session.format == "pipeline-v1" and session.metadata.get("pipeline_checks_unproven"):
+        unproven = [event.id for event in events if event.kind == "pipeline_check"
+                    and event.metadata.get("passed") and event.metadata.get("evidence") != "matched"]
+        findings.append(Finding(
+            "evidence_unproven", "critical",
+            f"{len(unproven)} check(s) report a pass without matching evidence",
+            unproven[:10],
+            "Record evidence_path for each check and keep the file the verifier hashed; "
+            "a pass is counted only when the file exists and matches evidence_sha256.",
+        ))
     if session.format == "retrieval-v1" and session.metadata.get("retrieval_escalation_deferred"):
         findings.append(Finding(
             "escalation_deferred", "warning", "Retrieval requires browser escalation",
@@ -298,7 +308,8 @@ def compare(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
     if pipeline:
         keys.extend(("pipeline_checks_required", "pipeline_checks_passed", "pipeline_checks_failed",
                      "pipeline_checks_missing", "pipeline_stages_completed", "pipeline_stages_missing",
-                     "pipeline_timeouts", "pipeline_duration_ms", "pipeline_success"))
+                     "pipeline_timeouts", "pipeline_duration_ms", "pipeline_success",
+                     "pipeline_checks_proven", "pipeline_checks_unproven", "pipeline_reported_success"))
     return {
         "schema_version": 1,
         "before": before["session"]["id"], "after": after["session"]["id"],

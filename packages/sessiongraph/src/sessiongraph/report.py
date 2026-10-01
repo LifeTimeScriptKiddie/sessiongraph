@@ -59,10 +59,13 @@ def markdown(analysis: dict[str, Any]) -> str:
         lines[4:4] = [
             f"- Reported verification: **{metrics['pipeline_checks_passed']}/{metrics['pipeline_checks_required']} checks passed**; "
             f"failed: {metrics['pipeline_checks_failed']}; missing: {metrics['pipeline_checks_missing']}",
+            f"- Proven by evidence: **{metrics.get('pipeline_checks_proven', 0)}/{metrics['pipeline_checks_required']}**; "
+            f"evidence files: {metrics.get('pipeline_evidence', {})}",
             f"- Completed stages: {metrics['pipeline_stages_completed']}/{metrics['pipeline_stages_required']}; "
             f"missing: {metrics['pipeline_stages_missing']}; timeouts: {metrics['pipeline_timeouts']}",
             f"- Contract satisfied: **{bool(metrics['pipeline_success'])}**; recorded stage time: {metrics['pipeline_duration_ms']} ms",
-            "- Verdicts come from the supplied verifier record. SessionGraph does not execute checks or certify their truth.",
+            "- A pass counts only when its evidence file exists and matches the recorded hash. "
+            "SessionGraph does not re-run checks, so a matching file is the one the verifier hashed, not proof its verdict is right.",
         ]
     if session["format"] == "memory-plane-v1":
         lines[4:4] = [
