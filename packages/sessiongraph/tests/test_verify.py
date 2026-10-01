@@ -207,6 +207,7 @@ class LoopSheetTests(unittest.TestCase):
         self.assertEqual(rows[0]["unit"], "request")
         self.assertEqual({r["turn_id"]: r["stratum"] for r in rows[1:]},
                          {"varied": "flagged", "same": "flagged", "calm": "sample"})
-        self.assertIn("* ", shown)
-        self.assertIn("npm run x1", shown)
-        self.assertIn("ERROR", shown)
+        self.assertIn("3 failed", shown)
+        self.assertIn("Bash ×3", shown)
+        self.assertIn("FAIL  Bash: npm run x1", shown)
+        self.assertNotIn("same_tool_failing", shown, "labeling is blind to which detector fired")

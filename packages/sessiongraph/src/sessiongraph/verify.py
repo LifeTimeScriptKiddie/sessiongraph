@@ -287,19 +287,62 @@ def loop_sheet(requests: list[Request], sample: int = 40, seed: int = 7) -> list
     return [header, *flagged, *picked]
 
 
+_CD_PREFIX = re.compile(r"^cd\s+\S+\s*&&\s*")
+_NOISE = re.compile(r"</?tool_use_error>|^Exit code \d+\s*")
+
+
+def _short(text: str, width: int) -> str:
+    text = " ".join(text.replace(str(Path.home()), "~").split())
+    return text if len(text) <= width else text[: width - 1] + "…"
+
+
+def _what(call: dict[str, Any]) -> str:
+    return _short(_CD_PREFIX.sub("", call["input"]), 48)
+
+
+def _why(call: dict[str, Any]) -> str:
+    return _short(_NOISE.sub("", call.get("result", "")).strip() or "(no message)", 60)
+
+
 def request_text(row: dict[str, Any]) -> str:
-    """Re-read one request's tool calls from its transcript; flagged calls are marked with *."""
+    """A short, blind summary of one request: the ask, failures in full, successful runs collapsed.
+
+    It does not say which detector flagged the request, so the labeler is not nudged.
+    """
     for request in read_requests(Path(row["path"])):
         if request.id != row["turn_id"]:
             continue
-        marked = {e for detect in LOOP_DETECTORS.values() for e in detect(request)}
-        lines = [f"prompt: {(_request_prompt(row) or '')[:200]}"]
-        for index, call in enumerate(request.calls[:60], 1):
-            status = "ERROR" if call.get("error") else "ok"
-            lines.append(f"{'*' if call['id'] in marked else ' '} {index:>2}. {call['name']} {call['input']}"
-                         f"\n       -> {status}: {call.get('result', '(no result)')}")
-        if len(request.calls) > 60:
-            lines.append(f"   ... {len(request.calls) - 60} more call(s)")
+        calls = request.calls
+        failed = [c for c in calls if c.get("error")]
+        lines = [f"You asked: {_short(_request_prompt(row) or '(prompt not shown)', 110)}", "",
+                 f"The agent made {len(calls)} tool call(s); {len(failed)} failed."]
+        if failed:
+            by_tool: dict[str, int] = {}
+            for call in failed:
+                by_tool[call["name"]] = by_tool.get(call["name"], 0) + 1
+            lines.append("Failures by tool: " + ", ".join(f"{n} ×{k}" for n, k in by_tool.items()))
+        lines.append("")
+        run: list[tuple[int, dict[str, Any]]] = []
+
+        def flush() -> None:
+            if not run:
+                return
+            first, last = run[0][0], run[-1][0]
+            tools: dict[str, int] = {}
+            for _, call in run:
+                tools[call["name"]] = tools.get(call["name"], 0) + 1
+            span = f"{first}" if first == last else f"{first}-{last}"
+            lines.append(f"  {span:>7}  ok    " + ", ".join(f"{n} ×{k}" if k > 1 else n for n, k in tools.items()))
+            run.clear()
+
+        for index, call in enumerate(calls, 1):
+            if not call.get("error"):
+                run.append((index, call))
+                continue
+            flush()
+            lines.append(f"  {index:>7}  FAIL  {call['name']}: {_what(call)}")
+            lines.append(f"  {'':>7}        why: {_why(call)}")
+        flush()
         return "\n".join(lines)
     return "(request not found: transcript changed or moved)"
 

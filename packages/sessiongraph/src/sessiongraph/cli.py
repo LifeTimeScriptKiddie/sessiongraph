@@ -184,13 +184,12 @@ def _label_interactively(path: str) -> int:
     show = request_text if rows[0].get("unit") == "request" else turn_text
     todo = [r for r in rows[1:] if r.get("labeled_by") not in {"human", "code"}]
     print(rows[0]["question"])
-    print(f"{len(todo)} turn(s) to label. y = yes, n = no, s = skip, q = save and quit")
+    print(f"{len(todo)} to label. y = yes, n = no, s = skip, q = save and quit")
+    # Blind labeling: which detector flagged a row is not shown, so it cannot nudge the answer.
     for index, row in enumerate(todo, 1):
-        fired = ", ".join(name for name, hit in row["flags"].items() if hit) or "none (recall sample)"
-        print(f"\n[{index}/{len(todo)}] author={row['author']} ({row['author_reason']}); flagged by: {fired}")
-        print(f"signals: {row['signals']}")
+        print(f"\n{'─' * 72}\n{index} of {len(todo)}\n")
         print(show(row) if show is request_text else show(row)[:800])
-        answer = input(f"{rows[0]['question']} [y/n/s/q] ").strip().lower()
+        answer = input(f"\n{rows[0]['question']}\n[y/n/s/q] ").strip().lower()
         if answer == "q":
             break
         if answer in {"y", "n"}:
