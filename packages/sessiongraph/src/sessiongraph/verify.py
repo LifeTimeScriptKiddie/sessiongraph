@@ -288,7 +288,8 @@ def loop_sheet(requests: list[Request], sample: int = 40, seed: int = 7) -> list
 
 
 _CD_PREFIX = re.compile(r"^cd\s+\S+\s*&&\s*")
-_NOISE = re.compile(r"</?tool_use_error>|^Exit code \d+\s*")
+_NOISE = re.compile(r"</?tool_use_error>")
+_EXIT = re.compile(r"^Exit code (\d+)\s*")
 
 
 def _short(text: str, width: int) -> str:
@@ -301,7 +302,13 @@ def _what(call: dict[str, Any]) -> str:
 
 
 def _why(call: dict[str, Any]) -> str:
-    return _short(_NOISE.sub("", call.get("result", "")).strip() or "(no message)", 60)
+    """The failure reason; a non-zero exit shows its code, so ordinary output reads as such."""
+    text = _NOISE.sub("", call.get("result", "")).strip()
+    code = _EXIT.match(text)
+    if code:
+        rest = text[code.end():].strip()
+        return _short(f"exit {code.group(1)} · {rest or '(no output)'}", 60)
+    return _short(text or "(no message)", 60)
 
 
 def request_text(row: dict[str, Any]) -> str:

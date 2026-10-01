@@ -164,7 +164,8 @@ def _call(tid, name, inp):
 
 def _result(tid, error):
     return {"type": "user", "timestamp": "2026-09-20T10:00:02Z", "message": {"content": [
-        {"type": "tool_result", "tool_use_id": tid, "is_error": error, "content": f"{SECRET} out"}]}}
+        {"type": "tool_result", "tool_use_id": tid, "is_error": error,
+         "content": f"Exit code 1\n{SECRET} out" if error else f"{SECRET} out"}]}}
 
 
 class LoopSheetTests(unittest.TestCase):
@@ -210,4 +211,5 @@ class LoopSheetTests(unittest.TestCase):
         self.assertIn("3 failed", shown)
         self.assertIn("Bash ×3", shown)
         self.assertIn("FAIL  Bash: npm run x1", shown)
+        self.assertIn("why: exit 1 · ", shown)
         self.assertNotIn("same_tool_failing", shown, "labeling is blind to which detector fired")
