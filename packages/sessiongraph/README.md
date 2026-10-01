@@ -247,6 +247,14 @@ as such rather than being inferred by SessionGraph.
 - `dead_end`: the final recorded event is errored or aborted;
 - `dangling_edges`: a parent referenced by the selected branch is absent.
 
+Every applicable detector is also written to `checks` in `analysis.json`, whether it fired or not:
+a node `check:<code>` with its measured `value` (yes/no, a count, or a ratio), the event IDs that are
+its evidence, its rule, and its `basis`. `definition` means the value is the recorded fact itself;
+`heuristic` means it stands for a claim beyond the record (`repeated_action`, `alternating_loop`) and is
+unverified until human labels measure it. `compare` reports `check_delta` (after minus before, yes = 1),
+and the scorecard's `no_worse_checks` gate fails when any check value rises. These values, not the
+finding text, are what later steps consume.
+
 These are review signals, not diagnoses of model intent. `workflow_health` is a deterministic triage score, not a quality benchmark.
 
 ## Development

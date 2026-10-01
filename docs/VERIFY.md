@@ -4,7 +4,7 @@ SessionGraph never takes an agent's output as given, and that includes its own d
 
 | Step | What happens | Output |
 | --- | --- | --- |
-| Check | Code answers yes or no per turn, from recorded fields only | `flags` per detector |
+| Check | Code answers yes/no or a number from recorded fields only | `flags` per detector; `checks` in `analysis.json` |
 | Label | A human labels every flagged turn and a random sample of unflagged ones | `label`, `labeled_by: human` |
 | Verify | Precision on the flagged turns; recall estimated from the sample | `verified`, `unverified` or `insufficient_labels` |
 | Recommend | Only verified detectors may drive a recommendation | (next step) |

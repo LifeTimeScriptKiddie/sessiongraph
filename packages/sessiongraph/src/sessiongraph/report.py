@@ -88,12 +88,22 @@ def markdown(analysis: dict[str, Any]) -> str:
             f"Evidence event IDs: {', '.join(f'`{item}`' for item in finding['evidence'])}", "",
             f"Recommendation: {finding['recommendation']}", "",
         ])
+    if analysis.get("checks"):
+        lines.extend(["## Checks", "",
+                      "Each check answers yes/no or a number from the record. `heuristic` checks are unverified "
+                      "against human labels.", "",
+                      "| Check | Value | Fired | Basis | Rule |", "| --- | --- | --- | --- | --- |"])
+        for check in analysis["checks"]:
+            value = "n/a" if check["value"] is None else check["value"]
+            lines.append(f"| `{check['code']}` | {value} | {'yes' if check['fired'] else 'no'} | "
+                         f"{check['basis']} | {check['rule']} |")
+        lines.append("")
     lines.extend([
         "## Improvement loop", "",
         "1. Choose one finding and write a falsifiable workflow change.",
         "2. Run comparable tasks with the baseline and candidate workflow.",
         "3. Analyze both sessions and use `sessiongraph compare`.",
-        "4. Keep the change only when the target metric improves without a regression in errors or user corrections.",
+        "4. Keep the change only when the target metric improves and no check value gets worse.",
         "", "## Interaction graph", "", "```mermaid", mermaid(analysis).rstrip(), "```", "",
         "Content is omitted by default; evidence uses event IDs and stable fingerprints.", "",
     ])

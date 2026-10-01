@@ -21,6 +21,7 @@ DEFAULT_GATES: dict[str, Any] = {
     "max_finding_delta": 0,
     "forbid_new_dangling_edges": True,
     "forbid_new_critical_findings": True,
+    "forbid_worse_checks": True,
 }
 
 
@@ -104,6 +105,20 @@ def evaluate_scorecard(
             "observed": new_critical,
             "required": [],
         })
+
+    if active.get("forbid_worse_checks"):
+        # Consume the checks' measured values, not finding prose or counts. Every check
+        # measures a problem, so a higher value is worse. Old analyses have no checks.
+        with_checks = [bool(item.get("checks")) for item in (before, after)]
+        if any(with_checks):
+            check_delta = comparison.get("check_delta") or {}
+            worse = sorted(code for code, change in check_delta.items() if change is not None and change > 0)
+            gate_rows.append({
+                "id": "no_worse_checks",
+                "ok": all(with_checks) and not worse,
+                "observed": worse if all(with_checks) else "only one analysis has checks; re-analyze the other",
+                "required": [],
+            })
 
     ok = all(row["ok"] for row in gate_rows)
     failed_gates = [row["id"] for row in gate_rows if not row["ok"]]

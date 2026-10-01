@@ -15,6 +15,59 @@ class Finding:
     summary: str
     evidence: list[str]
     recommendation: str
+    value: bool | int | float = True  # the measured answer this finding reports
+
+
+# Every check answers yes/no or a number. Findings are the checks that fired; the
+# value is what later steps (compare, scorecard, suggest) consume, never the prose.
+# basis "definition": the value is the recorded fact itself (the last event is an error).
+# basis "heuristic":  the value stands for a claim beyond the record (this is a loop);
+#                     unverified until human labels measure it (docs/VERIFY.md).
+CHECKS: dict[str, tuple[str, str, str]] = {
+    # code: (value kind, rule, basis)
+    "repeated_action": ("count", "signatures called >= 3 times in 8 calls with >= 2 failures and no success", "heuristic"),
+    "alternating_loop": ("bool", "A-B-A-B tool signatures with >= 2 failures", "heuristic"),
+    "errors": ("count", "errored events with no later success of the same tool signature", "definition"),
+    "dead_end": ("bool", "the last recorded event is an error or abort", "definition"),
+    "dangling_edges": ("count", "events whose parent is absent", "definition"),
+    "loop_incomplete": ("bool", "no recognized terminal record at the end of the loop trace", "definition"),
+    "loop_telemetry_gap": ("count", "failed agent stages with no failureClass", "definition"),
+    "agent_timeout": ("count", "agent stages recorded with failureClass timeout", "definition"),
+    "loop_bottleneck": ("ratio", "slowest stage share of >= 30 s recorded agent time; fires at >= 0.75", "definition"),
+    "pipeline_contract": ("bool", "a required stage or check did not pass with matching evidence", "definition"),
+    "evidence_unproven": ("count", "checks reporting a pass without matching evidence", "definition"),
+    "escalation_deferred": ("bool", "retrieval recorded a deferred browser escalation", "definition"),
+}
+FORMAT_CHECKS = {
+    "agentctl-loop-v1": ("loop_incomplete", "loop_telemetry_gap", "agent_timeout", "loop_bottleneck"),
+    "pipeline-v1": ("pipeline_contract", "evidence_unproven"),
+    "retrieval-v1": ("escalation_deferred",),
+}
+BASE_CHECKS = ("repeated_action", "alternating_loop", "errors", "dead_end", "dangling_edges")
+
+
+def _checks(session_format: str, findings: list[Finding], metrics: dict[str, Any]) -> list[dict[str, Any]]:
+    """One node per applicable check, fired or not, holding its measured value."""
+    codes = list(BASE_CHECKS) + list(FORMAT_CHECKS.get(session_format, ()))
+    codes += [f.code for f in findings if f.code not in codes]
+    out = []
+    for code in dict.fromkeys(codes):
+        kind, rule, basis = CHECKS.get(code, ("bool", "format-specific finding", "heuristic"))
+        hits = [f for f in findings if f.code == code]
+        if code == "repeated_action":
+            value: bool | int | float | None = len(hits)
+        elif code == "loop_bottleneck":
+            stages = metrics.get("loop_stage_duration_ms") or {}
+            total = sum(stages.values())
+            value = round(max(stages.values()) / total, 3) if total >= 30_000 else None
+        elif kind == "bool":
+            value = bool(hits)
+        else:
+            value = hits[0].value if hits else 0
+        out.append({"id": f"check:{code}", "code": code, "kind": kind, "value": value, "fired": bool(hits),
+                    "rule": rule, "basis": basis,
+                    "evidence": list(dict.fromkeys(e for f in hits for e in f.evidence))})
+    return out
 
 
 # Baseline keyword rule for verify.py; human labels put its precision at 0.11, so analyze does not use it.
@@ -51,6 +104,7 @@ def _repeated(events: list[Event], minimum: int = 3, window: int = 8) -> list[Fi
                 f"Repeated {actions[end].name or 'tool'} action {len(group)} times in a short window",
                 [event.id for event in group],
                 "Add an explicit retry budget and require a changed hypothesis or input after two identical attempts.",
+                len(group),
             ))
     return findings
 
@@ -109,6 +163,7 @@ def _quality(events: list[Event]) -> list[Finding]:
             "errors", "warning", summary,
             [event.id for event in unrecovered[:10]],
             "Classify failures before retrying and record whether the next action changes the failing condition.",
+            len(unrecovered),
         ))
     # No user_correction finding: no detector has passed human-label verification yet
     # (see docs/VERIFY.md). CORRECTION_TERMS stays as the baseline that verify.py measures.
@@ -143,6 +198,7 @@ def _agentctl_quality(events: list[Event]) -> list[Finding]:
             [event.id for event in unclassified[:10]],
             "Record failureClass for both generator and evaluator results. "
             "A long duration alone does not establish a timeout; repair capture before choosing a retry policy.",
+            len(unclassified),
         ))
     timeouts = [
         event for event in events
@@ -155,6 +211,7 @@ def _agentctl_quality(events: list[Event]) -> list[Finding]:
             f"Observed {len(timeouts)} timed-out agentctl loop stage(s)",
             [event.id for event in timeouts[:10]],
             "Record the failed adapter, preserve completed branches, and retry through a bounded fallback edge.",
+            len(timeouts),
         ))
     timed = [
         event for event in events
@@ -176,6 +233,7 @@ def _agentctl_quality(events: list[Event]) -> list[Finding]:
                 f"The {slowest} stage consumed {share:.0%} of recorded agent time",
                 evidence[:10],
                 "Test a faster first-pass stage or conditional escalation while holding the acceptance threshold fixed.",
+                round(share, 3),
             ))
     return findings
 
@@ -224,6 +282,7 @@ def analyze(session: Session) -> dict[str, Any]:
             unproven[:10],
             "Record evidence_path for each check and keep the file the verifier hashed; "
             "a pass is counted only when the file exists and matches evidence_sha256.",
+            len(unproven),
         ))
     if session.format == "retrieval-v1" and session.metadata.get("retrieval_escalation_deferred"):
         findings.append(Finding(
@@ -237,7 +296,7 @@ def analyze(session: Session) -> dict[str, Any]:
     if dangling:
         findings.append(Finding(
             "dangling_edges", "info", f"Graph has {len(dangling)} events whose parent is absent",
-            dangling[:10], "Load the complete session branch when lineage analysis matters.",
+            dangling[:10], "Load the complete session branch when lineage analysis matters.", len(dangling),
         ))
     score = max(0, 100 - sum({"info": 3, "warning": 12, "critical": 30}[f.severity] for f in findings))
     loop_durations: Counter[str] = Counter()
@@ -246,7 +305,7 @@ def analyze(session: Session) -> dict[str, Any]:
             duration = event.metadata.get("durationMs")
             if isinstance(duration, (int, float)) and not isinstance(duration, bool) and duration >= 0:
                 loop_durations[event.kind.removeprefix("loop_")] += duration
-    return {
+    result = {
         "schema_version": 1,
         "session": {
             "id": session.id, "source": Path(session.source).name,
@@ -285,6 +344,20 @@ def analyze(session: Session) -> dict[str, Any]:
                       for event in events for parent_id in _parents(event)],
         },
     }
+    result["checks"] = _checks(session.format, findings, result["metrics"])
+    return result
+
+
+def _number(value: Any) -> float | None:
+    return float(value) if isinstance(value, (bool, int, float)) else None
+
+
+def check_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+    """After minus before for every check present in both analyses (yes = 1, no = 0)."""
+    left = {c["code"]: _number(c.get("value")) for c in before.get("checks") or []}
+    right = {c["code"]: _number(c.get("value")) for c in after.get("checks") or []}
+    return {code: (round(right[code] - left[code], 3) if left[code] is not None and right[code] is not None else None)
+            for code in left.keys() & right.keys()}
 
 
 def compare(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
@@ -314,6 +387,7 @@ def compare(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
         "schema_version": 1,
         "before": before["session"]["id"], "after": after["session"]["id"],
         "delta": {key: after_metrics.get(key, 0) - before_metrics.get(key, 0) for key in keys},
+        "check_delta": check_delta(before, after),
         "finding_delta": len(after.get("findings", [])) - len(before.get("findings", [])),
         **({"comparable": True, "comparison_scope": "same fixture, verifier and declared contract; reported checks only",
             "before_source_sha256": before["session"]["metadata"].get("source_sha256"),
