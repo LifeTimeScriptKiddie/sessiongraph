@@ -155,3 +155,58 @@ class VerifyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _call(tid, name, inp):
+    return {"type": "assistant", "timestamp": "2026-09-20T10:00:01Z", "message": {
+        "id": f"m_{tid}", "content": [{"type": "tool_use", "id": tid, "name": name, "input": inp}]}}
+
+
+def _result(tid, error):
+    return {"type": "user", "timestamp": "2026-09-20T10:00:02Z", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": tid, "is_error": error, "content": f"{SECRET} out"}]}}
+
+
+class LoopSheetTests(unittest.TestCase):
+    def _transcript(self, root: Path):
+        records = [_user("varied", f"fix it {SECRET}", **HUMAN)]
+        for i in range(3):  # same tool, different arguments, all failing
+            records += [_call(f"v{i}", "Bash", {"command": f"npm run x{i}"}), _result(f"v{i}", True)]
+        records.append(_user("same", "again", **HUMAN))
+        for i in range(3):  # identical failing call: what repeated_action needs
+            records += [_call(f"s{i}", "Bash", {"command": "npm run x"}), _result(f"s{i}", True)]
+        records.append({**_user("note", "task done"), "origin": {"kind": "task-notification"}})
+        records.append(_user("calm", "read things", entrypoint="sdk-cli", promptSource="sdk"))
+        for i in range(4):
+            records += [_call(f"c{i}", "Read", {"file_path": f"/x/{i}"}), _result(f"c{i}", False)]
+        return _write(root / "s.jsonl", records)
+
+    def test_requests_and_detectors(self):
+        from sessiongraph.verify import LOOP_DETECTORS, read_requests
+
+        with tempfile.TemporaryDirectory() as tmp:
+            requests = {r.id: r for r in read_requests(self._transcript(Path(tmp)))}
+        self.assertEqual(set(requests), {"varied", "same", "calm"}, "system turns start no request")
+        self.assertEqual(requests["calm"].author, "agent")
+        flags = {rid: {n: bool(d(r)) for n, d in LOOP_DETECTORS.items()} for rid, r in requests.items()}
+        self.assertEqual(flags["varied"], {"repeated_action": False, "alternating_loop": False, "same_tool_failing": True})
+        self.assertTrue(flags["same"]["repeated_action"] and flags["same"]["same_tool_failing"])
+        self.assertFalse(any(flags["calm"].values()))
+
+    def test_loop_sheet_is_content_free_and_samples_long_unflagged_requests(self):
+        from sessiongraph.verify import request_text
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._transcript(root)
+            self.assertEqual(main(["label-loops", "--claude-code", str(root), "--out", str(root / "loops.jsonl")]), 0)
+            body = (root / "loops.jsonl").read_text(encoding="utf-8")
+            rows = [json.loads(line) for line in body.splitlines()]
+            shown = request_text(next(r for r in rows[1:] if r["turn_id"] == "varied"))
+        self.assertNotIn(SECRET, body)
+        self.assertEqual(rows[0]["unit"], "request")
+        self.assertEqual({r["turn_id"]: r["stratum"] for r in rows[1:]},
+                         {"varied": "flagged", "same": "flagged", "calm": "sample"})
+        self.assertIn("* ", shown)
+        self.assertIn("npm run x1", shown)
+        self.assertIn("ERROR", shown)

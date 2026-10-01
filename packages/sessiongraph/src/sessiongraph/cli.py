@@ -158,6 +158,13 @@ def _parser() -> argparse.ArgumentParser:
     lc_parser.add_argument("--sample", type=int, default=40, help="unflagged human turns to sample for recall")
     lc_parser.add_argument("--seed", type=int, default=7)
     lc_parser.add_argument("--out", required=True, help="sheet path (JSONL)")
+    ll_parser = sub.add_parser("label-loops",
+                               help="write a content-free sheet of requests for a human to label (loop detectors)")
+    ll_parser.add_argument("--claude-code", metavar="DIR", required=True, help="Claude Code transcripts root")
+    ll_parser.add_argument("--since", help="only activity since: 7d, 24h, or an ISO date")
+    ll_parser.add_argument("--sample", type=int, default=40, help="unflagged requests (>= 4 tool calls) to sample")
+    ll_parser.add_argument("--seed", type=int, default=7)
+    ll_parser.add_argument("--out", required=True, help="sheet path (JSONL)")
     label_parser = sub.add_parser("label", help="label a sheet interactively; only labels typed at a terminal count")
     label_parser.add_argument("sheet")
     vd_parser = sub.add_parser("verify-detectors",
@@ -169,11 +176,12 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _label_interactively(path: str) -> int:
-    from .verify import read_sheet, turn_text, write_sheet
+    from .verify import read_sheet, request_text, turn_text, write_sheet
 
     if not sys.stdin.isatty():
         raise ValueError("label needs a terminal: labels must come from a human, not a pipe or an agent")
     rows = read_sheet(path)
+    show = request_text if rows[0].get("unit") == "request" else turn_text
     todo = [r for r in rows[1:] if r.get("labeled_by") not in {"human", "code"}]
     print(rows[0]["question"])
     print(f"{len(todo)} turn(s) to label. y = yes, n = no, s = skip, q = save and quit")
@@ -181,8 +189,8 @@ def _label_interactively(path: str) -> int:
         fired = ", ".join(name for name, hit in row["flags"].items() if hit) or "none (recall sample)"
         print(f"\n[{index}/{len(todo)}] author={row['author']} ({row['author_reason']}); flagged by: {fired}")
         print(f"signals: {row['signals']}")
-        print(turn_text(row)[:800])
-        answer = input("correction? [y/n/s/q] ").strip().lower()
+        print(show(row) if show is request_text else show(row)[:800])
+        answer = input(f"{rows[0]['question']} [y/n/s/q] ").strip().lower()
         if answer == "q":
             break
         if answer in {"y", "n"}:
@@ -249,6 +257,16 @@ def main(argv: list[str] | None = None) -> int:
             head = rows[0]
             print(f"{len(rows) - 1} turn(s) to label ({len(rows) - 1 - head['sample_size']} flagged, "
                   f"{head['sample_size']} sampled for recall); authors {head['authors']}. "
+                  f"next: sessiongraph label {args.out}")
+            return 0
+        if args.command == "label-loops":
+            from .verify import loop_sheet, read_claude_requests, write_sheet
+
+            rows = loop_sheet(read_claude_requests(args.claude_code, _since(args.since)), args.sample, args.seed)
+            write_sheet(args.out, rows)
+            head = rows[0]
+            print(f"{len(rows) - 1} request(s) to label ({len(rows) - 1 - head['sample_size']} flagged, "
+                  f"{head['sample_size']} sampled for recall) out of {head['turns']}. "
                   f"next: sessiongraph label {args.out}")
             return 0
         if args.command == "label":

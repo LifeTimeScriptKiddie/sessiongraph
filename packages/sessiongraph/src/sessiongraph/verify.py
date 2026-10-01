@@ -14,8 +14,12 @@ This module verifies user-correction detectors over Claude Code transcripts:
                       run (interrupt or rejected tool call), or the agent reverted
                       work right after the turn
 
+It also verifies the loop detectors (repeated_action, alternating_loop) per
+request: a typed turn and every tool call the agent made for it.
+
 Label sheets are content-free: they store transcript paths and turn ids. The
-`label` command re-reads each turn's text from the transcript at labeling time.
+`label` command re-reads each turn's text, or a request's tool calls, from the
+transcript at labeling time.
 """
 
 from __future__ import annotations
@@ -28,7 +32,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from .analyze import CORRECTION_TERMS
+from .analyze import CORRECTION_TERMS, _alternating, _repeated
+from .model import Event
+from .privacy import fingerprint, sanitize
 from .workflows import _ts
 
 SCHEMA = "sessiongraph.labels.v1"
@@ -150,6 +156,159 @@ DETECTORS: dict[str, Callable[[Turn], bool]] = {
     "keyword_human": lambda t: t.author == "human" and _keyword(t.text),
     "behavior": lambda t: t.author == "human" and (t.stopped_before or t.reverted_after),
 }
+
+
+@dataclass(slots=True)
+class Request:
+    """A typed turn and the agent's tool calls for it, as analyze-compatible events."""
+    id: str
+    path: str
+    author: str
+    author_reason: str
+    events: list[Event]
+    calls: list[dict[str, Any]]  # for display at labeling time only; never written to a sheet
+
+
+def _call_summary(name: str, tool_input: Any) -> str:
+    if isinstance(tool_input, dict):
+        for key in ("command", "file_path", "pattern", "url", "query", "skill", "description", "prompt"):
+            if isinstance(tool_input.get(key), str):
+                return " ".join(tool_input[key].split())[:110]
+    return ""
+
+
+def read_requests(path: Path, since: datetime | None = None) -> list[Request]:
+    """Requests of one Claude Code transcript. System turns (notifications, summaries) start none."""
+    requests: list[Request] = []
+    try:
+        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    except OSError:
+        return requests
+    by_call: dict[str, dict[str, Any]] = {}
+    for line in lines:
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(rec, dict):
+            continue
+        ts = _ts(rec.get("timestamp"))
+        if since and ts and ts < since:
+            continue
+        msg = rec.get("message") if isinstance(rec.get("message"), dict) else {}
+        content = msg.get("content")
+        if rec.get("type") == "user":
+            text = _turn_text(content)
+            if text is not None:
+                text = text.strip()
+                if text and not text.startswith("<") and not _INTERRUPT.match(text):
+                    author, reason = author_of(rec, text)
+                    if author != "system":
+                        uid = str(rec.get("uuid") or f"line-{len(requests)}")
+                        requests.append(Request(uid, str(path), author, reason,
+                                                [Event(uid, None, "message", role="user")], []))
+                continue
+            if requests and isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "tool_result":
+                        call_id = str(block.get("tool_use_id"))
+                        error = bool(block.get("is_error"))
+                        requests[-1].events.append(Event(f"r-{call_id}", call_id, "tool_result", is_error=error))
+                        if call_id in by_call:
+                            body = block.get("content")
+                            body = body if isinstance(body, str) else json.dumps(body, default=str)
+                            by_call[call_id].update(error=error, result=" ".join(body.split())[:110])
+        elif rec.get("type") == "assistant" and requests:
+            for block in content or []:
+                if not isinstance(block, dict) or block.get("type") != "tool_use":
+                    continue
+                call_id, name = str(block.get("id")), str(block.get("name", "unknown"))
+                safe_args, _ = sanitize(block.get("input", {}))
+                current = requests[-1]
+                current.events.append(Event(call_id, current.events[-1].id, "tool_call", role="assistant", name=name,
+                                            signature=fingerprint("tool_call", name, safe_args)))
+                by_call[call_id] = {"id": call_id, "name": name, "input": _call_summary(name, block.get("input"))}
+                current.calls.append(by_call[call_id])
+    return requests
+
+
+def read_claude_requests(root: str | Path, since: datetime | None = None) -> list[Request]:
+    out: list[Request] = []
+    for path in sorted(Path(root).expanduser().glob("**/*.jsonl")):
+        if "subagents" not in path.parts:
+            out.extend(read_requests(path, since))
+    return out
+
+
+def _same_tool_failing(request: Request, minimum: int = 3) -> list[str]:
+    """Candidate: one tool fails >= 3 times in a request, whatever its arguments.
+
+    The analyze detectors need identical calls; agents usually change arguments
+    when they retry, so this asks the same question without that requirement.
+    """
+    failed = {e.parent_id for e in request.events if e.kind == "tool_result" and e.is_error}
+    by_tool: dict[str, list[str]] = {}
+    for event in request.events:
+        if event.kind == "tool_call" and event.id in failed:
+            by_tool.setdefault(event.name or "unknown", []).append(event.id)
+    return [call for calls in by_tool.values() if len(calls) >= minimum for call in calls]
+
+
+LOOP_DETECTORS: dict[str, Callable[[Request], list[str]]] = {
+    # each returns the evidence event ids it flagged (empty = no)
+    "repeated_action": lambda r: [e for f in _repeated(r.events) for e in f.evidence],
+    "alternating_loop": lambda r: [e for f in _alternating(r.events) for e in f.evidence],
+    "same_tool_failing": _same_tool_failing,
+}
+MIN_LOOP_SAMPLE_CALLS = 4  # a request with fewer calls cannot hold an A-B-A-B loop
+
+
+def loop_sheet(requests: list[Request], sample: int = 40, seed: int = 7) -> list[dict[str, Any]]:
+    """Rows to label: every flagged request, plus a seeded sample of unflagged ones with >= 4 tool calls."""
+    flagged, unflagged = [], []
+    for request in requests:
+        hits = {name: detect(request) for name, detect in LOOP_DETECTORS.items()}
+        row = {"turn_id": request.id, "path": request.path, "author": request.author,
+               "author_reason": request.author_reason, "flags": {name: bool(ids) for name, ids in hits.items()},
+               "signals": {"tool_calls": len(request.calls),
+                           "errors": sum(e.kind == "tool_result" and e.is_error for e in request.events)},
+               "label": None, "labeled_by": None}
+        if any(row["flags"].values()):
+            flagged.append({**row, "stratum": "flagged"})
+        elif len(request.calls) >= MIN_LOOP_SAMPLE_CALLS:
+            unflagged.append({**row, "stratum": "sample"})
+    picked = random.Random(seed).sample(unflagged, min(sample, len(unflagged)))
+    header = {"schema": SCHEMA, "kind": "header", "unit": "request",
+              "question": "Was the agent stuck in a loop here, repeating similar steps without making progress?",
+              "turns": len(requests), "authors": {a: sum(r.author == a for r in requests)
+                                                   for a in ("human", "agent", "unknown")},
+              "unflagged_human": len(unflagged), "sample_size": len(picked), "seed": seed,
+              "detectors": sorted(LOOP_DETECTORS)}
+    return [header, *flagged, *picked]
+
+
+def request_text(row: dict[str, Any]) -> str:
+    """Re-read one request's tool calls from its transcript; flagged calls are marked with *."""
+    for request in read_requests(Path(row["path"])):
+        if request.id != row["turn_id"]:
+            continue
+        marked = {e for detect in LOOP_DETECTORS.values() for e in detect(request)}
+        lines = [f"prompt: {(_request_prompt(row) or '')[:200]}"]
+        for index, call in enumerate(request.calls[:60], 1):
+            status = "ERROR" if call.get("error") else "ok"
+            lines.append(f"{'*' if call['id'] in marked else ' '} {index:>2}. {call['name']} {call['input']}"
+                         f"\n       -> {status}: {call.get('result', '(no result)')}")
+        if len(request.calls) > 60:
+            lines.append(f"   ... {len(request.calls) - 60} more call(s)")
+        return "\n".join(lines)
+    return "(request not found: transcript changed or moved)"
+
+
+def _request_prompt(row: dict[str, Any]) -> str:
+    for turn in read_turns(Path(row["path"])):
+        if turn.id == row["turn_id"]:
+            return turn.text
+    return ""
 
 
 def label_sheet(turns: list[Turn], sample: int = 40, seed: int = 7) -> list[dict[str, Any]]:

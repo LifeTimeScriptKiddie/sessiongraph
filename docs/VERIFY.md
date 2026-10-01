@@ -53,6 +53,18 @@ A `user`-role turn isn't always a person. Author comes from recorded fields, nev
 
 Classifier denials and safety interrupts do not count as a human stopping the agent.
 
+## Loop detectors
+
+`sessiongraph label-loops --claude-code ~/.claude/projects --out loops.jsonl` builds the same kind of sheet, one row per request (a typed turn plus every tool call the agent made for it). Requests started by agentctl prompts count too: agents loop whoever prompted them. `label` shows each request's tool calls, with flagged calls marked `*`.
+
+| Detector | Yes when |
+| --- | --- |
+| `repeated_action` | The `analyze` rule: an identical call 3 times in 8 calls with at least 2 failures and no success |
+| `alternating_loop` | The `analyze` rule: A-B-A-B identical calls with at least 2 failures |
+| `same_tool_failing` | Candidate: one tool fails at least 3 times in the request, whatever its arguments |
+
+On one developer's 394 Claude Code requests (4,586 tool calls), neither `analyze` rule fired once: no identical failing call repeated more than twice, because the agent changes its arguments when it retries. `same_tool_failing` flags 16 requests. The random sample (requests with at least 4 tool calls) measures what all three miss.
+
 ## Why labels must come from a human
 
 If an agent writes the ground truth, the agent is being trusted again. Only rows with `labeled_by: human` count, plus rows that code settles as "no" because a human didn't type the turn (`labeled_by: code`). Any other labels, including a `code` label on a human turn, are reported as `ignored_non_human_labels`. `sessiongraph label` refuses to run without a terminal. That stops a pipe or an agent, but not someone editing the file by hand.
