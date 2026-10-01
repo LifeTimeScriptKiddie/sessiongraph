@@ -7,7 +7,7 @@ SessionGraph never takes an agent's output as given, and that includes its own d
 | Check | Code answers yes/no or a number from recorded fields only | `flags` per detector; `checks` in `analysis.json` |
 | Label | A human labels every flagged turn and a random sample of unflagged ones | `label`, `labeled_by: human` |
 | Verify | Precision on the flagged turns; recall estimated from the sample | `verified`, `unverified` or `insufficient_labels` |
-| Recommend | Only verified detectors may drive a recommendation | (next step) |
+| Recommend | Only recorded-fact or verified checks may drive `suggest-workflow`; the rest are listed as held back | `held_back_unverified` in `manifest.json` |
 
 ## Run it
 

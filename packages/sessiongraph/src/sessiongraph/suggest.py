@@ -243,13 +243,30 @@ HEALTHY_RULE = TopologyRule(
 )
 
 
+# Heuristic checks that human labels have verified (docs/VERIFY.md). Empty until one passes.
+VERIFIED_HEURISTICS: frozenset[str] = frozenset()
+
+
+def trusted(code: Any) -> bool:
+    """A finding may drive a recommendation only when its check is a recorded fact or verified."""
+    from .analyze import CHECKS
+
+    spec = CHECKS.get(str(code))
+    return code in VERIFIED_HEURISTICS or (spec is not None and spec[2] == "definition")
+
+
+def held_back(findings: list[dict[str, Any]]) -> list[str]:
+    """Mapped findings that were not used because their check is unverified."""
+    return sorted({str(f.get("code")) for f in findings if f.get("code") in MAPPING and not trusted(f.get("code"))})
+
+
 def select_findings(
     findings: list[dict[str, Any]],
     *,
     max_findings: int = 3,
 ) -> list[dict[str, Any]]:
-    """Severity-rank findings, then spine priority, capped by max_findings."""
-    known = [f for f in findings if f.get("code") in MAPPING]
+    """Trusted findings only, severity-ranked, then spine priority, capped by max_findings."""
+    known = [f for f in findings if f.get("code") in MAPPING and trusted(f.get("code"))]
     known.sort(
         key=lambda f: (
             SEVERITY_RANK.get(str(f.get("severity", "info")), 9),
@@ -358,6 +375,8 @@ def render_rationale(plan: dict[str, Any], analysis: dict[str, Any]) -> str:
         f"- Mapping: `{MAPPING_VERSION}`",
         f"- Primary finding: `{plan.get('primary_finding') or 'healthy'}`",
         f"- Findings used: {', '.join(f'`{c}`' for c in plan.get('findings_used') or []) or '(none)'}",
+        f"- Held back (unverified heuristic checks): "
+        f"{', '.join(f'`{c}`' for c in held_back(list(analysis.get('findings') or []))) or '(none)'}",
         f"- Session workflow_health: **{(analysis.get('metrics') or {}).get('workflow_health', '?')}/100**",
         "",
         "## Applied rules",
@@ -383,7 +402,7 @@ def render_rationale(plan: dict[str, Any], analysis: dict[str, Any]) -> str:
         lines.extend([
             "## Skipped",
             "",
-            "No findings and `--include-healthy` was not set. No topology change suggested.",
+            "No findings from trusted checks and `--include-healthy` was not set. No topology change suggested.",
             "",
         ])
     lines.extend([
@@ -951,8 +970,10 @@ def build_manifest(
     task: str,
     out: Path,
     skipped: bool,
+    held: list[str] | None = None,
 ) -> dict[str, Any]:
     return {
+        "held_back_unverified": list(held or []),
         "schema_version": SCHEMA_VERSION,
         "mapping_version": MAPPING_VERSION,
         "target": target,
@@ -1048,6 +1069,7 @@ def suggest_workflow(
     source = source.expanduser().resolve()
     analysis = load_analysis(source)
     selected = select_findings(list(analysis.get("findings") or []), max_findings=max_findings)
+    held = held_back(list(analysis.get("findings") or []))
     label = _task_label(task, analysis)
     out = out.expanduser().resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -1068,15 +1090,16 @@ def suggest_workflow(
             "healthy": True,
         }
         manifest = build_manifest(
-            target=target, plan=plan, source=source, task=label, out=out, skipped=True,
+            target=target, plan=plan, source=source, task=label, out=out, skipped=True, held=held,
         )
         (out / "manifest.json").write_text(
             json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8",
         )
         (out / "rationale.md").write_text(render_rationale(plan, analysis), encoding="utf-8")
         (out / "SKIPPED.md").write_text(
-            "# No suggestion\n\nSession has no mapped findings. "
-            "Pass `--include-healthy` for a linear template.\n",
+            "# No suggestion\n\nSession has no mapped findings from trusted checks. "
+            + (f"Held back because their checks are unverified heuristics: {', '.join(held)}. " if held else "")
+            + "Pass `--include-healthy` for a linear template.\n",
             encoding="utf-8",
         )
         return out
@@ -1093,7 +1116,7 @@ def suggest_workflow(
         }
 
     manifest = build_manifest(
-        target=target, plan=plan, source=source, task=label, out=out, skipped=False,
+        target=target, plan=plan, source=source, task=label, out=out, skipped=False, held=held,
     )
     (out / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8",

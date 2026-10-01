@@ -11,6 +11,15 @@ sessiongraph suggest-workflow <analysis.json|report-dir|session.jsonl> \
   [--out DIR] [--task "…"] [--max-findings 3] [--include-healthy]
 ```
 
+## Which findings may drive a suggestion
+
+Only findings whose check is a recorded fact (`basis: definition`, such as `dead_end`, `errors`
+or `pipeline_contract`) or a heuristic listed in `VERIFIED_HEURISTICS` after it passed human-label
+verification (see the repository's `docs/VERIFY.md`). That list is empty today, so `repeated_action`,
+`alternating_loop` and legacy `user_correction` findings are held back. They are named in
+`manifest.json` (`held_back_unverified`) and `rationale.md`, never dropped silently. If only held-back
+findings remain, the output is `SKIPPED.md`.
+
 ## Outputs
 
 | Target | Primary artifact |

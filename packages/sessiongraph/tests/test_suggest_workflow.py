@@ -11,6 +11,10 @@ from unittest.mock import patch
 from sessiongraph.cli import main
 from sessiongraph.suggest import MAPPING_VERSION, map_topology, select_findings, suggest_workflow
 
+# Mapping tests run as if the heuristic detectors had passed human-label verification;
+# HoldBackTests covers the default, where they are held back.
+AS_IF_VERIFIED = frozenset({"repeated_action", "alternating_loop", "user_correction"})
+
 
 FIXTURE_ANALYSIS = {
     "schema_version": 1,
@@ -42,6 +46,7 @@ class SuggestWorkflowTests(unittest.TestCase):
         path.write_text(json.dumps(body or FIXTURE_ANALYSIS, indent=2) + "\n", encoding="utf-8")
         return path
 
+    @patch("sessiongraph.suggest.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
     def test_markdown_target(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -168,6 +173,7 @@ class SuggestWorkflowTests(unittest.TestCase):
             # Content-free: fixture summaries must not leak into the sketch as raw transcript.
             self.assertNotIn("secret-user-utterance", js)
 
+    @patch("sessiongraph.suggest.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
     def test_claude_does_not_embed_transcript_text(self):
         body = dict(FIXTURE_ANALYSIS)
         body["findings"] = [
@@ -203,6 +209,7 @@ class SuggestWorkflowTests(unittest.TestCase):
             self.assertIn("repeatedFailureRounds: 2", run_yaml)
             self.assertIn("never auto-runs agentctl", run_yaml)
 
+    @patch("sessiongraph.suggest.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
     def test_severity_spine_dead_end_owns_handoff(self):
         body = {
             "schema_version": 1,
@@ -307,6 +314,7 @@ class SuggestWorkflowTests(unittest.TestCase):
                     0,
                 )
 
+    @patch("sessiongraph.suggest.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
     def test_report_dir_and_jsonl_inputs(self):
         fixture = Path(__file__).parent / "fixtures" / "pi-loop.jsonl"
         with TemporaryDirectory() as directory:
@@ -346,3 +354,33 @@ class SuggestWorkflowTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HoldBackTests(unittest.TestCase):
+    """By default only checks that are recorded facts may drive a recommendation."""
+
+    def _write(self, directory: str, findings: list[dict]) -> Path:
+        path = Path(directory) / "analysis.json"
+        path.write_text(json.dumps({**FIXTURE_ANALYSIS, "findings": findings}), encoding="utf-8")
+        return path
+
+    def test_unverified_heuristic_is_held_back_and_named(self):
+        with TemporaryDirectory() as directory:
+            out = suggest_workflow(self._write(directory, FIXTURE_ANALYSIS["findings"]),
+                                   target="markdown", out=Path(directory) / "out")
+            manifest = json.loads((out / "manifest.json").read_text())
+            self.assertEqual(manifest["findings_used"], ["errors"])
+            self.assertEqual(manifest["held_back_unverified"], ["repeated_action"])
+            self.assertIn("Held back (unverified heuristic checks): `repeated_action`", (out / "rationale.md").read_text())
+            self.assertNotIn("RetryBudget", (out / "workflow.md").read_text())
+
+    def test_only_heuristic_findings_means_no_suggestion(self):
+        loop = [{**FIXTURE_ANALYSIS["findings"][0]}]
+        with TemporaryDirectory() as directory:
+            out = suggest_workflow(self._write(directory, loop), target="markdown", out=Path(directory) / "out")
+            self.assertIn("repeated_action", (out / "SKIPPED.md").read_text())
+            self.assertFalse((out / "workflow.md").exists())
+
+    def test_legacy_user_correction_is_never_trusted_by_default(self):
+        legacy = [{"code": "user_correction", "severity": "info", "summary": "x", "evidence": [], "recommendation": ""}]
+        self.assertEqual(select_findings(legacy), [])

@@ -7,9 +7,15 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from unittest.mock import patch
+
 from sessiongraph.cli import main
 from sessiongraph.scorecard import SCORECARD_VERSION, evaluate_scorecard
 from sessiongraph.suggest import MAPPING_VERSION, topology_digest, topology_snapshot
+
+# Mapping tests run as if the heuristic detectors had passed human-label verification;
+# HoldBackTests covers the default, where they are held back.
+AS_IF_VERIFIED = frozenset({"repeated_action", "alternating_loop", "user_correction"})
 
 
 MATRIX_ROOT = Path(__file__).parent / "fixtures" / "suggest-matrix"
@@ -22,6 +28,7 @@ def _load_cases() -> list[dict]:
 
 
 class SuggestMatrixTests(unittest.TestCase):
+    @patch("sessiongraph.suggest.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
     def test_matrix_matches_goldens(self):
         for case in _load_cases():
             with self.subTest(case=case["id"]):
@@ -74,6 +81,7 @@ class SuggestMatrixTests(unittest.TestCase):
             )
             self.assertIn(expected["pi_meta_name"], js)
 
+    @patch("sessiongraph.suggest.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
     def test_multi_fault_contract_spine_beats_retry_guard(self):
         """pipeline_contract primary keeps contract phases; RetryBudget before VerifyArtifacts."""
         analysis = json.loads(
