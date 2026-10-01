@@ -236,7 +236,7 @@ as such rather than being inferred by SessionGraph.
 - `repeated_action`: the same canonical tool name and arguments appears three times inside eight tool calls, at least two attempts fail, and none records recovery;
 - `alternating_loop`: tool signatures form A-B-A-B with at least two failed results;
 - `errors`: unrecovered errored tool results or aborted messages occurred — an errored tool call whose same signature succeeds later in the session is treated as recovered and excluded, so the count reflects failures the run never got past;
-- `user_correction`: a user turn contains an English correction phrase;
+- `user_correction` is not reported: no correction detector has passed verification against human labels yet (see the repository's `docs/VERIFY.md`). Older analyses that contain it are still accepted by `suggest-workflow`;
 - `dead_end`: the final recorded event is errored or aborted;
 - `dangling_edges`: a parent referenced by the selected branch is absent.
 

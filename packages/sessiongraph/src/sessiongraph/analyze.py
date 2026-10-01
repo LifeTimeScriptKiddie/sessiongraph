@@ -17,6 +17,7 @@ class Finding:
     recommendation: str
 
 
+# Baseline keyword rule for verify.py; human labels put its precision at 0.11, so analyze does not use it.
 CORRECTION_TERMS = (
     "no,", "not what i", "that's wrong", "that is wrong", "try again", "you missed",
     "stop", "instead", "still failing", "doesn't work", "does not work",
@@ -109,16 +110,8 @@ def _quality(events: list[Event]) -> list[Finding]:
             [event.id for event in unrecovered[:10]],
             "Classify failures before retrying and record whether the next action changes the failing condition.",
         ))
-    corrections = [
-        event for event in events
-        if event.role == "user" and any(term in event.text.lower() for term in CORRECTION_TERMS)
-    ]
-    if corrections:
-        findings.append(Finding(
-            "user_correction", "info", f"Detected {len(corrections)} likely user correction turns",
-            [event.id for event in corrections[:10]],
-            "Convert repeated corrections into a concise project instruction or pre-flight checklist, then compare future sessions.",
-        ))
+    # No user_correction finding: no detector has passed human-label verification yet
+    # (see docs/VERIFY.md). CORRECTION_TERMS stays as the baseline that verify.py measures.
     if events and events[-1].is_error:
         findings.append(Finding(
             "dead_end", "critical", "Session ended on an error or abort",

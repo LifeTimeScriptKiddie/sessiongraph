@@ -19,6 +19,19 @@ sessiongraph verify-detectors corrections.jsonl --require behavior
 
 `verify-detectors` exits 0 only when every `--require`d detector is verified. The defaults are at least 10 labeled hits, precision ≥ 0.8 and estimated recall ≥ 0.5.
 
+## First result: no correction detector passes yet
+
+On one developer's 320 human-typed Claude Code turns (69 labeled by the human, 36 settled by code):
+
+| Detector | Precision | Estimated recall | Verdict |
+| --- | --- | --- | --- |
+| `keyword_any_author` (the old `analyze` rule) | 0.11 | 0.27 | unverified |
+| `keyword_human` | 0.47 | 0.30 | unverified |
+| `behavior` | 0.67 | 0.43 | unverified |
+| `behavior` or `keyword_human` | 0.55 | 0.69 | unverified |
+
+So `analyze` no longer reports `user_correction`. Two behavior signals are worth more data: a revert right after the turn was right 3 times out of 3, and a stop right before it was right 7 times out of 12.
+
 ## Who wrote the turn
 
 A `user`-role turn isn't always a person. Author comes from recorded fields, never from the text:

@@ -1,14 +1,14 @@
 # SessionGraph
 
 **Stop hand-debugging agent sessions.** When a coding agent loops on the same
-tool call, stalls in a dead end, or needs correcting three times, you usually find
+tool call, stalls in a dead end, or keeps failing the same way, you usually find
 out by scrolling the transcript and guessing. SessionGraph reads the session log
 instead, points to the exact events where it went wrong, and drafts a guarded
 workflow that heads off the same failure on the next run.
 
 | You get | How |
 |---|---|
-| The failure points, by event | Detects repeated and alternating tool loops, dead ends, unrecovered errors, agent timeouts and user corrections; every finding cites event IDs |
+| The failure points, by event | Detects repeated and alternating tool loops, dead ends, unrecovered errors and agent timeouts; every finding cites event IDs. A detector is only reported once human labels verify it |
 | A fix to try, not just a report | `sessiongraph suggest-workflow` turns the top findings into a workflow with guard steps for Claude Code, Pi or agentctl. You review it; nothing runs automatically |
 | Proof it helped | `workflows-compare` checks a before/after pair, so a recommendation is kept or rolled back on evidence |
 | Privacy by default | Runs locally and never calls a model or network service. Reports omit transcript and tool-argument content unless you pass `--include-content` |
