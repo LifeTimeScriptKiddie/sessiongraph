@@ -1,6 +1,6 @@
 # Plan: self-restoring and self-modifying SessionGraph
 
-Status: plan, not built. Written 2026-10-03 from repository research by agentctl lanes (codex GPT Luna and cursor Composer), web research (agy Gemini), and local checks of every cited file and line.
+Status: plan, not built. Scope: Claude Code sessions in any repository; other tools later. Written 2026-10-03 from repository research by agentctl lanes (codex GPT Luna and cursor Composer), web research (agy Gemini), and local checks of every cited file and line.
 
 ## Goal
 
@@ -38,6 +38,71 @@ The agy summaries add mechanisms beyond these primary claims. Treat them as desi
 | Settings rollback exists only for routing preferences | `agentctl tune --rollback` |
 | Detector parameters are hard-coded | `analyze.py:80` `_repeated(minimum=3, window=8)`; `verify.py:243` `_same_tool_failing(minimum=3)` |
 | Real example of a noisy verdict | 2026-10-03, `lookups-low-effort`: median tokens 627 → 1,044 on 62 → 17 requests; "roll back or collect more runs" |
+
+## Scope: Claude Code first, any repo
+
+This plan targets **Claude Code sessions in any repository**. Other tools come later (see the end of this section). SessionGraph reads session logs, not code, so it is already mostly repo-agnostic. The gaps are in how Claude Code logs are read and grouped.
+
+Checked 2026-10-03 on the local transcripts: 23 project directories under `~/.claude/projects`, 18 distinct working directories (`cwd`), worktrees of one repo stored as separate directories, and 7 subagent transcripts that every reader skips.
+
+These steps come before Phase 3, so tuning is never fit to one repo or to a reader bug.
+
+### CC1. Group sessions by repository, not by directory
+
+- Each transcript records `cwd`.
+- The repo is the git root of `cwd`, so worktrees of one repo (for example `agentctl/dev-*` and `.claude/worktrees/*`) count as one repo, with the branch kept as a field.
+- Commands take `--repo PATH` to filter, and reports break results down per repo.
+- If a `cwd` no longer exists, it is reported as `repo: unknown`; it is never guessed from the directory name.
+
+**Exit check:** two worktrees of one repo produce one repo row, and a deleted `cwd` yields `unknown`.
+
+### CC2. One Claude Code reader for every command
+
+Today there are three readers: `workflows._read_claude_file`, `verify.read_turns` and `verify.read_requests`, and `analyze` can't read Claude Code at all.
+
+- Merge them into one reader that converts a transcript into the generic event format (`contracts/sessiongraph-generic-event.v1.schema.json`).
+- `analyze`, `workflows`, `label-*` and `verify-*` all consume that format.
+- Subagent transcripts are linked to their parent request as child events, not skipped.
+
+**Exit check:** `analyze` accepts a Claude Code transcript. All four commands report the same request and tool-call counts for the same file.
+
+### CC3. Declare which signals the log records
+
+The reader reports, per transcript, which signals it saw:
+- `origin` / `promptSource` (who typed the turn)
+- `toolDenialKind` (rejected tool calls)
+- interrupt markers
+- tool-result error flags
+- usage
+
+Older Claude Code versions lack some of these. A check that needs a missing signal reports `not_observable`, never `0` or `no`.
+
+**Exit check:** a transcript without `origin` fields gives `not_observable` for the correction and outcome checks, not a value.
+
+### CC4. Catch format drift
+
+Claude Code calls its transcript format internal, so it can change without notice.
+
+- Keep small synthetic sample transcripts for each Claude Code version seen.
+- Each run also compares its counts against the previous run: total tool calls, results paired to calls, turns by author.
+- A sharp drop, for example unpaired tool results going from 0 to many or human turns going to 0, stops the run as `reader_drift` instead of publishing wrong checks. Under Phase 1, the previous good run stays published.
+
+**Exit check:** a sample transcript with a renamed field makes the run fail with `reader_drift`, not succeed with empty results.
+
+### CC5. Per-repo phase patterns
+
+Test and build steps are recognized by command patterns (npm, pytest, cargo, go, make…).
+
+- An optional `.sessiongraph.toml` at the repo root may add patterns, such as `just test` or `bazel test`. It may only add patterns that classify commands as phases.
+- It can't change thresholds, checks or gates; those stay in the sealed judge (Phase 0).
+
+**Exit check:** a repo pattern turns a `just test` call into a `test` phase, and a `.sessiongraph.toml` that sets a threshold is rejected.
+
+### Later: other tools
+
+Once CC1–CC5 hold, other tools need only a converter into the same generic format, plus a CC3 signal list. Each tool's detectors are verified separately, because a detector verified on Claude Code logs is not verified for another agent.
+
+Suggested order: Codex (an ingest already exists in `src/adapters/codex.ts`), then Pi, then an OpenTelemetry reader, which covers any tool that exports traces.
 
 ## Phases
 
