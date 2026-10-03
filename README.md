@@ -102,6 +102,8 @@ See [docs/WORKFLOWS.md](docs/WORKFLOWS.md).
 
 A finding is only as good as its detector. `sessiongraph label-corrections`, `label` and `verify-detectors` measure each detector's precision and recall against human labels (agent labels never count). See [docs/VERIFY.md](docs/VERIFY.md).
 
+The plan for making SessionGraph self-restoring and self-modifying on top of these checks is in [docs/SELF-IMPROVE-PLAN.md](docs/SELF-IMPROVE-PLAN.md).
+
 ## Capture and inspect provenance
 
 ```sh
