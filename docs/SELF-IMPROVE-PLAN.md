@@ -102,7 +102,12 @@ Test and build steps are recognized by command patterns (npm, pytest, cargo, go,
 
 Once CC1–CC5 hold, other tools need only a converter into the same generic format, plus a CC3 signal list. Each tool's detectors are verified separately, because a detector verified on Claude Code logs is not verified for another agent.
 
-Suggested order: Codex (an ingest already exists in `src/adapters/codex.ts`), then Pi, then an OpenTelemetry reader, which covers any tool that exports traces.
+Order, decided 2026-10-03:
+
+1. **Claude Code**: CC1–CC5 above.
+2. **Pi**: the Python analyzer already parses Pi sessions (`parsers.parse_pi`, `discover_pi_sessions`). The remaining work is a converter into the generic format, a CC3 signal list, and its own detector verification. 27 local sessions as of 2026-10-03.
+3. **Codex**: a TypeScript ingest already exists (`src/adapters/codex.ts`); it needs a Python-side converter and a CC3 signal list. 965 local session files as of 2026-10-03. Many are likely headless runs started by agentctl, so author tagging (CC3) matters most here.
+4. **Later, optional**: an OpenTelemetry reader, which covers any tool that exports traces.
 
 ## Phases
 
