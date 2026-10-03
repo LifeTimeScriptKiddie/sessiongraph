@@ -213,3 +213,47 @@ class LoopSheetTests(unittest.TestCase):
         self.assertIn("FAIL  Bash: npm run x1", shown)
         self.assertIn("why: exit 1 · ", shown)
         self.assertNotIn("same_tool_failing", shown, "labeling is blind to which detector fired")
+
+
+class OutcomeTests(unittest.TestCase):
+    def _transcript(self, root: Path) -> Path:
+        records = [_user("loop", "fix it", **HUMAN)]
+        for i in range(3):  # flagged by same_tool_failing, and ends on a failure
+            records += [_call(f"l{i}", "Bash", {"command": f"x{i}"}), _result(f"l{i}", True)]
+        records.append(_user("stopped", "next thing", **HUMAN))
+        for i in range(4):
+            records += [_call(f"s{i}", "Read", {"file_path": f"/{i}"}), _result(f"s{i}", False)]
+        records.append({"type": "user", "message": {"content": [{"type": "text", "text": "[Request interrupted by user]"}]}})
+        records.append(_user("fine", "and this", **HUMAN))
+        for i in range(4):
+            records += [_call(f"f{i}", "Read", {"file_path": f"/{i}"}), _result(f"f{i}", False)]
+        return _write(root / "s.jsonl", records)
+
+    def test_outcomes_come_from_the_record(self):
+        from sessiongraph.verify import request_outcomes
+
+        with tempfile.TemporaryDirectory() as tmp:
+            outcomes = {r.id: bad for r, bad in request_outcomes(self._transcript(Path(tmp)))}
+        self.assertEqual(outcomes, {"loop": True, "stopped": True, "fine": False})
+
+    def test_lift_and_verdicts(self):
+        from sessiongraph.verify import verify_outcomes, request_outcomes
+
+        with tempfile.TemporaryDirectory() as tmp:
+            outcomes = request_outcomes(self._transcript(Path(tmp)))
+        report = verify_outcomes(outcomes)
+        same = report["detectors"]["same_tool_failing"]
+        self.assertEqual((same["flagged"], same["flagged_bad_rate"]), (1, 1.0))
+        self.assertEqual((same["comparison"], same["comparison_bad_rate"]), (2, 0.5))
+        self.assertEqual((same["lift"], same["verdict"]), (2.0, "insufficient_data"))
+        loose = verify_outcomes(outcomes, {"min_flagged": 1, "min_lift": 2.0})["detectors"]["same_tool_failing"]
+        self.assertEqual(loose["verdict"], "predictive")
+        self.assertEqual(report["detectors"]["repeated_action"]["verdict"], "insufficient_data")
+
+    def test_cli_require_exit_codes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._transcript(root)
+            self.assertEqual(main(["verify-outcomes", "--claude-code", str(root)]), 0)
+            self.assertEqual(main(["verify-outcomes", "--claude-code", str(root), "--require", "same_tool_failing"]), 1)
+            self.assertEqual(main(["verify-outcomes", "--claude-code", str(root), "--require", "nope"]), 2)

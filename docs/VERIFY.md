@@ -53,7 +53,19 @@ A `user`-role turn isn't always a person. Author comes from recorded fields, nev
 
 Classifier denials and safety interrupts do not count as a human stopping the agent.
 
-## Loop detectors
+## Loop detectors: verified by outcome, not by memory
+
+Loops are judged by what happened next, because a person can't reliably recall weeks-old agent behavior. A request **went badly** if the human stopped the agent right after it (an interrupt or rejected tool call before their next turn), or if its last tool call failed. Both are recorded facts, so no labels are needed:
+
+```sh
+sessiongraph verify-outcomes --claude-code ~/.claude/projects --require same_tool_failing
+```
+
+For each detector it compares how often flagged requests went badly against unflagged requests with at least 4 tool calls. The detector is `predictive` when at least 10 requests are flagged and they went badly at least twice as often (`lift` ≥ 2). It exits 0 only when every `--require`d detector is predictive. A predictive detector points at trouble; whether the trouble is a loop is a separate question.
+
+First result on one developer's 398 requests: 20 went badly (5%). `repeated_action` and `alternating_loop` never fired. `same_tool_failing` flagged 16, and 1 went badly (6%, against 4% for the rest, lift 1.4: not predictive). No loop detector may drive a recommendation.
+
+### Labeling loops by hand (optional)
 
 `sessiongraph label-loops --claude-code ~/.claude/projects --out loops.jsonl` builds the same kind of sheet, one row per request (a typed turn plus every tool call the agent made for it). Requests started by agentctl prompts count too: agents loop whoever prompted them. `label` shows each request's tool calls, with flagged calls marked `*`.
 

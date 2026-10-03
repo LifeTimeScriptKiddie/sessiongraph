@@ -165,6 +165,12 @@ def _parser() -> argparse.ArgumentParser:
     ll_parser.add_argument("--sample", type=int, default=40, help="unflagged requests (>= 4 tool calls) to sample")
     ll_parser.add_argument("--seed", type=int, default=7)
     ll_parser.add_argument("--out", required=True, help="sheet path (JSONL)")
+    vo_parser = sub.add_parser("verify-outcomes",
+                               help="do loop detectors point at requests that went badly? (no labels needed)")
+    vo_parser.add_argument("--claude-code", metavar="DIR", required=True, help="Claude Code transcripts root")
+    vo_parser.add_argument("--since", help="only activity since: 7d, 24h, or an ISO date")
+    vo_parser.add_argument("--require", nargs="*", default=[], help="exit 0 only if these detectors are predictive")
+    vo_parser.add_argument("--out", help="write the report JSON here")
     label_parser = sub.add_parser("label", help="label a sheet interactively; only labels typed at a terminal count")
     label_parser.add_argument("sheet")
     vd_parser = sub.add_parser("verify-detectors",
@@ -268,6 +274,18 @@ def main(argv: list[str] | None = None) -> int:
                   f"{head['sample_size']} sampled for recall) out of {head['turns']}. "
                   f"next: sessiongraph label {args.out}")
             return 0
+        if args.command == "verify-outcomes":
+            from .verify import read_claude_outcomes, verify_outcomes
+
+            report = verify_outcomes(read_claude_outcomes(args.claude_code, _since(args.since)))
+            body = json.dumps(report, indent=2, sort_keys=True) + "\n"
+            if args.out:
+                Path(args.out).write_text(body, encoding="utf-8")
+            print(body, end="")
+            unknown = [name for name in args.require if name not in report["detectors"]]
+            if unknown:
+                raise ValueError(f"unknown detector(s): {', '.join(unknown)}")
+            return 0 if all(report["detectors"][name]["verdict"] == "predictive" for name in args.require) else 1
         if args.command == "label":
             return _label_interactively(args.sheet)
         if args.command == "verify-detectors":

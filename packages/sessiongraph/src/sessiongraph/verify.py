@@ -444,3 +444,60 @@ def verify(rows: list[dict[str, Any]], t: dict[str, float] = THRESHOLDS) -> dict
             "sample": {"labeled": len(sample), "true_rate": _rate(sum(r["label"] for r in sample), len(sample)),
                        "unflagged_human": header["unflagged_human"]},
             "authors": header["authors"], "detectors": results}
+
+
+OUTCOME_SCHEMA = "sessiongraph.outcome-verification.v1"
+OUTCOME_THRESHOLDS: dict[str, float] = {"min_flagged": 10, "min_lift": 2.0}
+
+
+def request_outcomes(path: Path, since: datetime | None = None) -> list[tuple[Request, bool]]:
+    """Each request and whether it went badly, from recorded facts only.
+
+    Badly = the human stopped the agent right after it (interrupt or rejected
+    tool call before their next turn), or the request's last tool call failed.
+    """
+    turns = {turn.id: turn for turn in read_turns(path, since)}
+    requests = read_requests(path, since)
+    out = []
+    for index, request in enumerate(requests):
+        following = turns.get(requests[index + 1].id) if index + 1 < len(requests) else None
+        results = [e for e in request.events if e.kind == "tool_result"]
+        out.append((request, bool(following and following.stopped_before) or bool(results and results[-1].is_error)))
+    return out
+
+
+def read_claude_outcomes(root: str | Path, since: datetime | None = None) -> list[tuple[Request, bool]]:
+    out: list[tuple[Request, bool]] = []
+    for path in sorted(Path(root).expanduser().glob("**/*.jsonl")):
+        if "subagents" not in path.parts:
+            out.extend(request_outcomes(path, since))
+    return out
+
+
+def verify_outcomes(outcomes: list[tuple[Request, bool]], t: dict[str, float] = OUTCOME_THRESHOLDS) -> dict[str, Any]:
+    """Does a detector point at trouble? Compare how often flagged requests went badly with the rest.
+
+    No human labels: the outcome is computed from the record. The comparison
+    group is unflagged requests with >= 4 tool calls, so short requests do not
+    make flagged ones look worse than they are.
+    """
+    results = {}
+    for name, detect in LOOP_DETECTORS.items():
+        flagged = [bad for request, bad in outcomes if detect(request)]
+        rest = [bad for request, bad in outcomes
+                if len(request.calls) >= MIN_LOOP_SAMPLE_CALLS and not detect(request)]
+        flagged_rate = _rate(sum(flagged), len(flagged))
+        rest_rate = _rate(sum(rest), len(rest))
+        lift = round(flagged_rate / rest_rate, 2) if flagged_rate is not None and rest_rate else None
+        if len(flagged) < t["min_flagged"] or lift is None:
+            verdict = "insufficient_data"
+        else:
+            verdict = "predictive" if lift >= t["min_lift"] else "not_predictive"
+        results[name] = {"flagged": len(flagged), "flagged_went_badly": sum(flagged), "flagged_bad_rate": flagged_rate,
+                         "comparison": len(rest), "comparison_went_badly": sum(rest), "comparison_bad_rate": rest_rate,
+                         "lift": lift, "verdict": verdict}
+    return {"schema": OUTCOME_SCHEMA, "thresholds": t, "requests": len(outcomes),
+            "went_badly": sum(bad for _, bad in outcomes),
+            "outcome": "the human stopped the agent right after the request, or its last tool call failed",
+            "detectors": results}
+
