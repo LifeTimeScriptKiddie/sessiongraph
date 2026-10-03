@@ -19,7 +19,6 @@ commands and answers are read only to classify a phase and are never stored.
 
 from __future__ import annotations
 
-import json
 import math
 import re
 from collections import Counter, defaultdict
@@ -125,92 +124,54 @@ def read_claude_code(root: str | Path, since: datetime | None = None) -> list[Re
 
 
 def _read_claude_file(path: Path, since: datetime | None) -> list[Request]:
+    """Requests of one transcript, from the shared Claude Code reader (claude_code.py)."""
+    from .claude_code import is_boring, read_transcript, segment  # local import: claude_code imports this module
+
+    session = read_transcript(path, since, subagents=False)
     out: list[Request] = []
-    cur: Request | None = None
-    started: datetime | None = None
-    last: datetime | None = None
-    seen_usage: dict[str, int] = {}
-    phase_of_call: dict[str, str] = {}
-    last_tool_error = False
 
-    def flush() -> None:
-        nonlocal cur
-        if cur is not None and (cur.steps or cur.output_tokens):
-            if started and last:
-                cur.duration_ms = max(0, int((last - started).total_seconds() * 1000))
-            cur.ended_in_error = last_tool_error and cur.steps > 0
-            out.append(cur)
-        cur = None
+    def starts(turn) -> bool:
+        return bool(turn.metadata.get("string_content")) and not turn.metadata.get("meta") and not is_boring(turn)
 
-    try:
-        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
-    except OSError:
-        return out
-    for line in lines:
-        try:
-            rec = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(rec, dict):
-            continue
-        ts = _ts(rec.get("timestamp"))
-        if since and ts and ts < since:
-            continue
-        msg = rec.get("message") if isinstance(rec.get("message"), dict) else {}
-        kind = rec.get("type")
-        if kind == "user" and isinstance(msg.get("content"), str) and not rec.get("isMeta"):
-            m = _COMMAND.search(msg["content"])
-            command = m.group(1) if m else None
-            if command in _BORING_COMMANDS:
-                continue  # housekeeping commands are not workflows
-            flush()
-            cur = Request(session=path.stem, harness="claude-code", day=(ts or datetime.min).date().isoformat(),
-                          anchor=f"/{command}" if command else None)
-            started = ts
-            last = ts
-            last_tool_error = False
-            continue
-        if cur is None:
-            continue
-        if ts:
-            last = ts
-        if kind == "assistant":
-            if msg.get("model") and not str(msg["model"]).startswith("<"):
-                cur.model = msg["model"]
-            mid = msg.get("id")
-            usage = msg.get("usage") if isinstance(msg.get("usage"), dict) else {}
-            out_tokens = usage.get("output_tokens")
-            if isinstance(out_tokens, int) and mid:
-                # Claude Code writes one line per content block with the message's usage repeated.
-                cur.output_tokens += out_tokens - seen_usage.get(mid, 0) if out_tokens > seen_usage.get(mid, 0) else 0
-                seen_usage[mid] = max(out_tokens, seen_usage.get(mid, 0))
-            for block in msg.get("content") or []:
-                if not isinstance(block, dict) or block.get("type") != "tool_use":
-                    continue
-                name = str(block.get("name", ""))
-                if name == "Skill" and cur.anchor is None:
-                    skill = (block.get("input") or {}).get("skill")
-                    if isinstance(skill, str) and re.fullmatch(r"[\w:.-]{1,60}", skill):
-                        cur.anchor = f"skill:{skill}"
-                phase = phase_of(name, block.get("input") if isinstance(block.get("input"), dict) else None)
-                cur.steps += 1
+    for part in segment(session, starts):
+        command = part.turn.metadata.get("command")
+        started = last = _ts(part.turn.timestamp)
+        req = Request(session=path.stem, harness="claude-code", day=(started or datetime.min).date().isoformat(),
+                      anchor=f"/{command}" if command else None)
+        phase_of_call: dict[str, str] = {}
+        last_tool_error = False
+        for event in part.events:
+            if event.kind == "message" and event.role == "user" and is_boring(event):
+                continue  # housekeeping commands are not part of the request's timeline
+            ts = _ts(event.timestamp)
+            if ts:
+                last = ts
+            if event.kind == "message" and event.role == "assistant":
+                if event.metadata.get("model"):
+                    req.model = event.metadata["model"]
+                req.output_tokens += event.metadata.get("output_tokens") or 0
+            elif event.kind == "tool_call":
+                skill = event.metadata.get("skill")
+                if skill and req.anchor is None:
+                    req.anchor = f"skill:{skill}"
+                req.steps += 1
+                phase = event.metadata.get("phase")
                 if phase:
-                    cur.phases.append(phase)
-                    if isinstance(block.get("id"), str):
-                        phase_of_call[block["id"]] = phase
-        elif kind == "user":
-            content = msg.get("content")
-            if isinstance(content, list):
-                for block in content:
-                    if isinstance(block, dict) and block.get("type") == "tool_result":
-                        last_tool_error = bool(block.get("is_error"))
-                        if last_tool_error:
-                            cur.error_steps += 1
-                            ph = phase_of_call.get(str(block.get("tool_use_id")), "other")
-                            cur.error_phases[ph] = cur.error_phases.get(ph, 0) + 1
-                            if ph not in EXPECTED_FAILURE_PHASES:
-                                cur.friction_errors += 1
-    flush()
+                    req.phases.append(phase)
+                    phase_of_call[event.id] = phase
+            elif event.kind == "tool_result":
+                last_tool_error = event.is_error
+                if last_tool_error:
+                    req.error_steps += 1
+                    ph = phase_of_call.get(str(event.parent_id), "other")
+                    req.error_phases[ph] = req.error_phases.get(ph, 0) + 1
+                    if ph not in EXPECTED_FAILURE_PHASES:
+                        req.friction_errors += 1
+        if req.steps or req.output_tokens:
+            if started and last:
+                req.duration_ms = max(0, int((last - started).total_seconds() * 1000))
+            req.ended_in_error = last_tool_error and req.steps > 0
+            out.append(req)
     return out
 
 
@@ -346,8 +307,12 @@ def mine(requests: list[Request]) -> dict[str, Any]:
             "dfg": _dfg(r.shape for r in reqs),
         })
         families[-1]["typical_path"] = typical_path(families[-1]["dfg"])
+    from .claude_code import READER  # local import: claude_code imports this module
+
     return {
         "schema": SCHEMA,
+        # which reader produced the requests, so a count change can be traced to a reader change
+        "readers": {"claude-code": READER} if any(r.harness == "claude-code" for r in requests) else {},
         "requests": len(requests),
         "sessions": len({r.session for r in requests}),
         "days": sorted({r.day for r in requests if r.day}),

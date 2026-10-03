@@ -66,6 +66,14 @@ Today there are three readers: `workflows._read_claude_file`, `verify.read_turns
 
 **Exit check:** `analyze` accepts a Claude Code transcript. All four commands report the same request and tool-call counts for the same file.
 
+**Done 2026-10-03** (`claude_code.py`):
+- Every command now reads through one reader. Each command keeps its own rule for which turns start a request, so existing results stay comparable.
+- On a frozen copy of 23 project folders, the old and new readers gave identical counts: 436 workflow requests, 4,468 steps, 140 errors, output tokens, 414 turns, 11 stops, 5 reverts, 380 loop requests and 4,400 calls.
+- The one changed number is request duration (display only, never a gate). It no longer stretches to later bookkeeping records such as `away_summary`, which had added idle time.
+- `analyze` now detects a transcript within its first 200 records, because real ones open with up to 45 bookkeeping lines.
+- Linked subagent transcripts appear under the tool call that started them. Unlinked ones, started by a local command, are counted and not guessed.
+- `workflows.json` records the reader version.
+
 ### CC3. Declare which signals the log records
 
 The reader reports, per transcript, which signals it saw:

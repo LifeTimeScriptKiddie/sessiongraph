@@ -266,6 +266,10 @@ def load_session(path: str | Path) -> Session:
             lines.append(value)
     if not lines:
         raise ValueError(f"{source}: empty session")
+    from .claude_code import is_claude_code, read_transcript  # local import: claude_code imports workflows
+
+    if is_claude_code(lines[:200]):  # real transcripts open with up to ~50 bookkeeping records
+        return read_transcript(source)
     if lines[0].get("event") in AGENTCTL_LOOP_EVENTS and "iteration" in lines[0]:
         return parse_agentctl_loop(lines, source)
     if lines[0].get("type") == "session" and "version" in lines[0]:
