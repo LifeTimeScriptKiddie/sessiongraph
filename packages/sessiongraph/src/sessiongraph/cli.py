@@ -14,6 +14,7 @@ from .report import write_bundle
 from .retrieval import load_retrieval
 from .memory_plane import load_memory_plane
 from .pipeline import load_pipeline
+from .reader_health import ReaderDrift
 from .suggest import default_out_dir, suggest_workflow
 from .visualize import write_interactive_html
 from .workflows import mine, read_claude_code, read_generic, request_rows
@@ -147,6 +148,7 @@ def _parser() -> argparse.ArgumentParser:
     wf_parser.add_argument("--effort-evidence", help="an agentctl bench-effort result JSON, to size the lookup saving")
     wf_parser.add_argument("--out", required=True, help="output directory (workflows.json, workflows.md, workflows.html)")
     wf_parser.add_argument("--rows", action="store_true", help="also write per-request rows (content-free) to requests.json")
+    wf_parser.add_argument("--allow-drift", action="store_true", help="run even if the transcript reader looks out of date")
     wfc_parser = sub.add_parser("workflows-compare", help="keep or roll back one workflow recommendation (before/after workflows.json)")
     wfc_parser.add_argument("before")
     wfc_parser.add_argument("after")
@@ -154,6 +156,7 @@ def _parser() -> argparse.ArgumentParser:
     lc_parser = sub.add_parser("label-corrections",
                                help="write a content-free sheet of turns for a human to label (user-correction detectors)")
     lc_parser.add_argument("--claude-code", metavar="DIR", required=True, help="Claude Code transcripts root")
+    lc_parser.add_argument("--allow-drift", action="store_true", help="run even if the transcript reader looks out of date")
     lc_parser.add_argument("--since", help="only activity since: 7d, 24h, or an ISO date")
     lc_parser.add_argument("--sample", type=int, default=40, help="unflagged human turns to sample for recall")
     lc_parser.add_argument("--seed", type=int, default=7)
@@ -161,6 +164,7 @@ def _parser() -> argparse.ArgumentParser:
     ll_parser = sub.add_parser("label-loops",
                                help="write a content-free sheet of requests for a human to label (loop detectors)")
     ll_parser.add_argument("--claude-code", metavar="DIR", required=True, help="Claude Code transcripts root")
+    ll_parser.add_argument("--allow-drift", action="store_true", help="run even if the transcript reader looks out of date")
     ll_parser.add_argument("--since", help="only activity since: 7d, 24h, or an ISO date")
     ll_parser.add_argument("--sample", type=int, default=40, help="unflagged requests (>= 4 tool calls) to sample")
     ll_parser.add_argument("--seed", type=int, default=7)
@@ -168,9 +172,15 @@ def _parser() -> argparse.ArgumentParser:
     vo_parser = sub.add_parser("verify-outcomes",
                                help="do loop detectors point at requests that went badly? (no labels needed)")
     vo_parser.add_argument("--claude-code", metavar="DIR", required=True, help="Claude Code transcripts root")
+    vo_parser.add_argument("--allow-drift", action="store_true", help="run even if the transcript reader looks out of date")
     vo_parser.add_argument("--since", help="only activity since: 7d, 24h, or an ISO date")
     vo_parser.add_argument("--require", nargs="*", default=[], help="exit 0 only if these detectors are predictive")
     vo_parser.add_argument("--out", help="write the report JSON here")
+    rh_parser = sub.add_parser("reader-health",
+                               help="check that the Claude Code reader sees transcripts as written (format drift)")
+    rh_parser.add_argument("--claude-code", metavar="DIR", required=True, help="Claude Code transcripts root")
+    rh_parser.add_argument("--baseline", help="a previous healthy reader-health JSON to compare coverage against")
+    rh_parser.add_argument("--out", help="write the report JSON here")
     label_parser = sub.add_parser("label", help="label a sheet interactively; only labels typed at a terminal count")
     label_parser.add_argument("sheet")
     vd_parser = sub.add_parser("verify-detectors",
@@ -179,6 +189,15 @@ def _parser() -> argparse.ArgumentParser:
     vd_parser.add_argument("--require", nargs="*", default=[], help="exit 0 only if these detectors are verified")
     vd_parser.add_argument("--out", help="write the report JSON here")
     return parser
+
+
+def _reader_health(root: str | None, allow: bool) -> dict | None:
+    """Refuse to build results on a reader that may not see the transcripts as written."""
+    if not root:
+        return None
+    from .reader_health import check, require_healthy
+
+    return check(root) if allow else require_healthy(root)
 
 
 def _label_interactively(path: str) -> int:
@@ -226,6 +245,7 @@ def main(argv: list[str] | None = None) -> int:
             if not args.claude_code and not args.sessions:
                 raise ValueError("give --claude-code DIR and/or --sessions FILES")
             since = _since(args.since)
+            health = _reader_health(args.claude_code, args.allow_drift)
             requests = []
             if args.claude_code:
                 requests += read_claude_code(args.claude_code, since)
@@ -235,6 +255,8 @@ def main(argv: list[str] | None = None) -> int:
             if isinstance(evidence, dict) and "result" in evidence and "levels" not in evidence:
                 evidence = evidence["result"]
             doc = judge(mine(requests), evidence)
+            if health:
+                doc["reader_health"] = {"verdict": health["verdict"], "drift": health["drift"], "rates": health["rates"]}
             destination = Path(args.out).resolve()
             destination.mkdir(parents=True, exist_ok=True)
             (destination / "workflows.json").write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
@@ -257,6 +279,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "label-corrections":
             from .verify import label_sheet, read_claude_turns, write_sheet
 
+            _reader_health(args.claude_code, args.allow_drift)
+
             rows = label_sheet(read_claude_turns(args.claude_code, _since(args.since)), args.sample, args.seed)
             write_sheet(args.out, rows)
             head = rows[0]
@@ -266,6 +290,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "label-loops":
             from .verify import loop_sheet, read_claude_requests, write_sheet
+
+            _reader_health(args.claude_code, args.allow_drift)
 
             rows = loop_sheet(read_claude_requests(args.claude_code, _since(args.since)), args.sample, args.seed)
             write_sheet(args.out, rows)
@@ -277,6 +303,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "verify-outcomes":
             from .verify import read_claude_outcomes, verify_outcomes
 
+            _reader_health(args.claude_code, args.allow_drift)
+
             report = verify_outcomes(read_claude_outcomes(args.claude_code, _since(args.since)))
             body = json.dumps(report, indent=2, sort_keys=True) + "\n"
             if args.out:
@@ -286,6 +314,16 @@ def main(argv: list[str] | None = None) -> int:
             if unknown:
                 raise ValueError(f"unknown detector(s): {', '.join(unknown)}")
             return 0 if all(report["detectors"][name]["verdict"] == "predictive" for name in args.require) else 1
+        if args.command == "reader-health":
+            from .reader_health import check
+
+            baseline = json.loads(Path(args.baseline).read_text(encoding="utf-8")) if args.baseline else None
+            report = check(args.claude_code, baseline)
+            body = json.dumps(report, indent=2, sort_keys=True) + "\n"
+            if args.out:
+                Path(args.out).write_text(body, encoding="utf-8")
+            print(body, end="")
+            return 0 if report["verdict"] == "ok" else 1
         if args.command == "label":
             return _label_interactively(args.sheet)
         if args.command == "verify-detectors":
@@ -410,6 +448,9 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(body, end="")
         return 0
+    except ReaderDrift as exc:
+        print(f"sessiongraph: {exc}", file=sys.stderr)
+        return 3
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
         print(f"sessiongraph: {exc}", file=sys.stderr)
         return 2

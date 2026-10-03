@@ -97,6 +97,20 @@ Claude Code calls its transcript format internal, so it can change without notic
 
 **Exit check:** a sample transcript with a renamed field makes the run fail with `reader_drift`, not succeed with empty results.
 
+**Done 2026-10-03** (`reader_health.py`, `sessiongraph reader-health`):
+- An independent raw JSON count must match the reader's count of tool calls, tool results and user turns, transcript by transcript.
+- Absolute limits:
+  - unparseable records ≤ 1%
+  - conversation records missing their message ≤ 1%
+  - unknown content-block types ≤ 1%
+  - tool results without their call ≤ 5%
+  - records with no conversation at all count as drift at any size
+- With `--baseline`, a later run fails if who-typed-it coverage, usage coverage or conversation share falls more than 0.2 below the last healthy run. New record types, block types and Claude Code versions are listed as notes.
+- `workflows`, `label-corrections`, `label-loops` and `verify-outcomes` refuse to write anything on drift (exit 3) unless `--allow-drift` is passed. `workflows.json` records the health result.
+- Real data (99 transcripts, 33,577 records, 15 Claude Code versions): healthy; the reader matches the raw count everywhere; about 1.7 s.
+- Tests rename a block type, the `message` field and the `type` field, and break result pairing; each gives `reader_drift`.
+- Still to do under Phase 1: the weekly job should keep the last healthy report as its `--baseline`.
+
 ### CC5. Per-repo phase patterns
 
 Test and build steps are recognized by command patterns (npm, pytest, cargo, go, make…).
