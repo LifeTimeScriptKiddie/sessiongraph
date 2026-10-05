@@ -15,6 +15,7 @@ from .retrieval import load_retrieval
 from .memory_plane import load_memory_plane
 from .pipeline import load_pipeline
 from .reader_health import ReaderDrift
+from .repos import UNKNOWN, repo_of
 from .suggest import default_out_dir, suggest_workflow
 from .visualize import write_interactive_html
 from .workflows import mine, read_claude_code, read_generic, request_rows
@@ -149,6 +150,8 @@ def _parser() -> argparse.ArgumentParser:
     wf_parser.add_argument("--out", required=True, help="output directory (workflows.json, workflows.md, workflows.html)")
     wf_parser.add_argument("--rows", action="store_true", help="also write per-request rows (content-free) to requests.json")
     wf_parser.add_argument("--allow-drift", action="store_true", help="run even if the transcript reader looks out of date")
+    wf_parser.add_argument("--repo", metavar="PATH", help="only sessions whose working directory is in this repo (worktrees included)")
+    wf_parser.add_argument("--by-repo", action="store_true", help="split each family per repo and judge each part on its own")
     wfc_parser = sub.add_parser("workflows-compare", help="keep or roll back one workflow recommendation (before/after workflows.json)")
     wfc_parser.add_argument("before")
     wfc_parser.add_argument("after")
@@ -254,7 +257,12 @@ def main(argv: list[str] | None = None) -> int:
             evidence = json.loads(Path(args.effort_evidence).read_text(encoding="utf-8")) if args.effort_evidence else None
             if isinstance(evidence, dict) and "result" in evidence and "levels" not in evidence:
                 evidence = evidence["result"]
-            doc = judge(mine(requests), evidence)
+            if args.repo:
+                wanted = repo_of(str(Path(args.repo).expanduser()))
+                if wanted == UNKNOWN:
+                    raise ValueError(f"--repo {args.repo}: no such directory")
+                requests = [r for r in requests if r.repo == wanted]
+            doc = judge(mine(requests, by_repo=args.by_repo), evidence)
             if health:
                 doc["reader_health"] = {"verdict": health["verdict"], "drift": health["drift"], "rates": health["rates"]}
             destination = Path(args.out).resolve()

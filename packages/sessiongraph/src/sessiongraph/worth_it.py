@@ -42,6 +42,7 @@ def judge_family(fam: dict[str, Any], effort_evidence: dict[str, Any] | None = N
                  lookup_share: float | None = None) -> dict[str, Any]:
     """Verdict, reasons and (when not observe) a recommendation with its success metric."""
     name = fam["family"]
+    base = fam.get("base_family", name)  # without the `<repo>/` prefix of a per-repo family
     reasons: list[str] = []
     n, sessions, days = fam["requests"], fam["sessions"], fam["days"]
     evidence_ok = n >= t["min_requests"] and sessions >= t["min_sessions"] and days >= t["min_days"]
@@ -53,12 +54,12 @@ def judge_family(fam: dict[str, Any], effort_evidence: dict[str, Any] | None = N
         return {"verdict": "observe", "reasons": reasons, "recommendation": None}
 
     metric_base = f"families.{name}"
-    if name in LOOKUP_FAMILIES:
+    if base in LOOKUP_FAMILIES:
         share = lookup_share if lookup_share is not None else fam["share"]
         if share < t["lookup_min_share"] or (fam.get("median_output_tokens") or 0) < t["lookup_min_tokens"]:
             reasons.append(f"question-answering is {round(share * 100)}% of requests at a median {fam.get('median_output_tokens') or 0} output tokens: too small to tune")
             return {"verdict": "observe", "reasons": reasons, "recommendation": None}
-        what = "answered without tools" if name == "answer-only" else "answered by reading only (explore)"
+        what = "answered without tools" if base == "answer-only" else "answered by reading only (explore)"
         reasons.append(f"{round(share * 100)}% of all requests are question-answering; this family ({what}) is "
                        f"{round(fam['share'] * 100)}%, median {fam['median_output_tokens']} output tokens each")
         saving = None
@@ -76,7 +77,7 @@ def judge_family(fam: dict[str, Any], effort_evidence: dict[str, Any] | None = N
             "verdict": "cheap_fix",
             "reasons": reasons,
             "recommendation": {
-                "id": "lookups-low-effort",
+                "id": "lookups-low-effort" + (f"-{name.split('/', 1)[0]}" if base != name else ""),
                 "change": "Run lookup-shaped requests at low effort (or on a fast lane): in Claude Code, `/effort low` "
                           "for question-answering sessions or a lower default `effortLevel`; in agentctl, delegate "
                           "lookups with effort low.",
@@ -110,14 +111,14 @@ def judge_family(fam: dict[str, Any], effort_evidence: dict[str, Any] | None = N
 
     reasons.extend(problems)
     dominant = fam.get("typical_path") or (fam["variants"][0]["shape"] if fam["variants"] else [])
-    surface = ("the skill itself" if name.startswith("skill:") else "the slash command" if name.startswith("/")
+    surface = ("the skill itself" if base.startswith("skill:") else "the slash command" if base.startswith("/")
                else "a skill or slash command that fixes the dominant path")
     key = "unrecovered_rate" if unrecovered >= t["unrecovered_rate"] and fam["ended_in_error"] >= t["unrecovered_min"] else "friction_rate"
     return {
         "verdict": "engineer",
         "reasons": reasons,
         "recommendation": {
-            "id": f"codify-{name.strip('/').replace(':', '-')}",
+            "id": f"codify-{name.strip('/').replace(':', '-').replace('/', '-')}",
             "change": f"Codify the '{name}' workflow in {surface}: typical path {' > '.join(dominant) or '(none)'}, "
                       "with an explicit verification step and a stop rule for repeated errors.",
             "surfaces": ["claude-code: skill / slash command / CLAUDE.md", "codex: AGENTS.md / skill", "cursor: rule", "agentctl: task template"],
@@ -131,9 +132,12 @@ def judge_family(fam: dict[str, Any], effort_evidence: dict[str, Any] | None = N
 def judge(mined: dict[str, Any], effort_evidence: dict[str, Any] | None = None) -> dict[str, Any]:
     """Apply the gate to every family; summarize what to do overall."""
     verdicts = []
-    lookup_share = sum(f["share"] for f in mined.get("families", []) if f["family"] in LOOKUP_FAMILIES)
+    lookup_share: dict[str | None, float] = {}  # per repo when families are split by repo
+    for f in mined.get("families", []):
+        if f.get("base_family", f["family"]) in LOOKUP_FAMILIES:
+            lookup_share[f.get("repo")] = lookup_share.get(f.get("repo"), 0) + f["share"]
     for fam in mined.get("families", []):
-        v = judge_family(fam, effort_evidence, lookup_share=lookup_share)
+        v = judge_family(fam, effort_evidence, lookup_share=lookup_share.get(fam.get("repo")))
         fam.update(v)
         verdicts.append(v["verdict"])
     counts = {k: verdicts.count(k) for k in ("observe", "cheap_fix", "engineer")}
@@ -173,11 +177,12 @@ def compare(before: dict[str, Any], after: dict[str, Any], recommendation: dict[
             continue
         ok = a < b if spec["direction"] == "down" else a <= b if spec["direction"] == "not_up" else a > b
         gates.append({"gate": role, "key": spec["key"], "before": b, "after": a, "pass": ok})
-    fam = recommendation.get("metric", {}).get("key", "").split(".")[1:2]
+    parts = recommendation.get("metric", {}).get("key", "").split(".")
+    fam = ".".join(parts[1:-1])
     comparable = True
     if fam:
-        nb = read_metric(before, f"families.{fam[0]}.requests") or 0
-        na = read_metric(after, f"families.{fam[0]}.requests") or 0
+        nb = read_metric(before, f"families.{fam}.requests") or 0
+        na = read_metric(after, f"families.{fam}.requests") or 0
         comparable = na >= THRESHOLDS["min_requests"] and nb >= THRESHOLDS["min_requests"]
         gates.append({"gate": "comparable workload", "before": nb, "after": na, "pass": comparable})
     passed = bool(gates) and all(g["pass"] for g in gates)

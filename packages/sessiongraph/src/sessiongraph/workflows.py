@@ -28,6 +28,8 @@ from pathlib import Path
 from statistics import median
 from typing import Any, Iterable
 
+from .repos import UNKNOWN, display, repo_of, slugs
+
 SCHEMA = "sessiongraph.workflows.v1"
 PHASES = ("explore", "edit", "test", "build", "commit", "delegate", "subagent", "web", "skill", "shell")
 MAX_SHAPE = 8
@@ -88,6 +90,8 @@ class Request:
     ended_in_error: bool = False
     output_tokens: int = 0
     duration_ms: int = 0
+    repo: str = "unknown"  # git root of the session's cwd (repos.repo_of); worktrees count as their main repo
+    branch: str | None = None
 
     @property
     def shape(self) -> tuple[str, ...]:
@@ -137,7 +141,8 @@ def _read_claude_file(path: Path, since: datetime | None) -> list[Request]:
         command = part.turn.metadata.get("command")
         started = last = _ts(part.turn.timestamp)
         req = Request(session=path.stem, harness="claude-code", day=(started or datetime.min).date().isoformat(),
-                      anchor=f"/{command}" if command else None)
+                      anchor=f"/{command}" if command else None, repo=repo_of(part.turn.metadata.get("cwd")),
+                      branch=part.turn.metadata.get("git_branch"))
         phase_of_call: dict[str, str] = {}
         last_tool_error = False
         for event in part.events:
@@ -268,12 +273,18 @@ def typical_path(dfg: dict[str, int], limit: int = MAX_SHAPE) -> list[str]:
     return out
 
 
-def mine(requests: list[Request]) -> dict[str, Any]:
-    """Families with their DFG, variants and cost/failure profile."""
+def mine(requests: list[Request], by_repo: bool = False) -> dict[str, Any]:
+    """Families with their DFG, variants and cost/failure profile.
+
+    With by_repo, a family is split per repository and named `<repo>/<family>`, so one
+    repo's habits are judged on their own instead of being blended with every other repo.
+    """
+    short = slugs({r.repo for r in requests})
     groups: dict[str, list[Request]] = defaultdict(list)
     for r in requests:
-        groups[family_of(r)].append(r)
+        groups[f"{short[r.repo]}/{family_of(r)}" if by_repo else family_of(r)].append(r)
     total = len(requests) or 1
+    per_repo = Counter(r.repo for r in requests)
     families = []
     for name, reqs in sorted(groups.items(), key=lambda kv: -len(kv[1])):
         variants = Counter(r.shape for r in reqs)
@@ -282,8 +293,14 @@ def mine(requests: list[Request]) -> dict[str, Any]:
         errs = sum(1 for r in reqs if r.error_steps)
         families.append({
             "family": name,
+            "base_family": family_of(reqs[0]),
+            "repo": display(reqs[0].repo) if by_repo else None,
+            # where this family ran: repo -> requests (content-free: repo paths only)
+            "repos": {display(k): v for k, v in Counter(r.repo for r in reqs).most_common()},
+            "branches": len({(r.repo, r.branch) for r in reqs if r.branch}),
             "requests": len(reqs),
-            "share": round(len(reqs) / total, 3),
+            # share of all requests, or of its repo's requests when split by repo
+            "share": round(len(reqs) / (per_repo[reqs[0].repo] if by_repo else total), 3),
             "sessions": len({r.session for r in reqs}),
             "days": len({r.day for r in reqs if r.day}),
             "harnesses": dict(Counter(r.harness for r in reqs)),
@@ -314,6 +331,8 @@ def mine(requests: list[Request]) -> dict[str, Any]:
         # which reader produced the requests, so a count change can be traced to a reader change
         "readers": {"claude-code": READER} if any(r.harness == "claude-code" for r in requests) else {},
         "requests": len(requests),
+        "by_repo": by_repo,
+        "repos": {display(k): v for k, v in Counter(r.repo for r in requests).most_common()},
         "sessions": len({r.session for r in requests}),
         "days": sorted({r.day for r in requests if r.day}),
         "families": families,

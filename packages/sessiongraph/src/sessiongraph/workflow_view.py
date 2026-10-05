@@ -86,6 +86,9 @@ def summary_markdown(doc: dict[str, Any]) -> str:
         f"**{gate.get('headline', '')}.** {doc.get('requests', 0)} requests, {doc.get('sessions', 0)} sessions, "
         f"{len(doc.get('days', []))} day(s). Content-free: phases, counts and token usage only.",
         "",
+        "Repos: " + (", ".join(f"{k} ({v})" for k, v in list((doc.get("repos") or {}).items())[:8]) or "—")
+        + (" — families split per repo; share is of the repo's requests." if doc.get("by_repo") else ""),
+        "",
         "| Family | Requests | Share | Sessions | Days | Median steps | Median out tokens | Friction | Ended on error | Variants | Verdict |",
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
@@ -98,7 +101,8 @@ def summary_markdown(doc: dict[str, Any]) -> str:
         if f.get("verdict") in ("cheap_fix", "engineer"):
             r = f["recommendation"]
             out += ["", f"## {f['family']}: {VERDICT_TEXT[f['verdict']]}", "",
-                    *[f"- {x}" for x in f.get("reasons", [])], "",
+                    *[f"- {x}" for x in f.get("reasons", [])],
+                    "- repos: " + ", ".join(f"{k} ({v})" for k, v in list((f.get("repos") or {}).items())[:5]), "",
                     f"**Change ({r['id']}):** {r['change']}", "",
                     f"**Expected:** {r['expected']}. **Metric:** `{r['metric']['key']}` {r['metric']['direction']}"
                     + (f"; guard `{r['guard']['key']}` {r['guard']['direction']}" if r.get("guard") else "") + "."]

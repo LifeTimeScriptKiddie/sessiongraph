@@ -149,7 +149,9 @@ def _read_events(path: Path, since: datetime | None, prefix: str = "") -> tuple[
             add(Event(rid, None, "message", role="user", timestamp=ts, text=stripped, metadata={
                 "author": author, "author_reason": reason, "meta": bool(rec.get("isMeta")),
                 "wrapper": stripped.startswith("<"), "command": command.group(1) if command else None,
-                "string_content": isinstance(content, str)}))
+                "string_content": isinstance(content, str),
+                "cwd": rec.get("cwd") if isinstance(rec.get("cwd"), str) else None,
+                "git_branch": rec.get("gitBranch") if isinstance(rec.get("gitBranch"), str) else None}))
             continue
         if isinstance(content, list):
             result = rec.get("toolUseResult")
