@@ -17,6 +17,7 @@ from .pipeline import load_pipeline
 from .reader_health import ReaderDrift
 from .repos import UNKNOWN, repo_of
 from .suggest import default_out_dir, suggest_workflow
+from .codify import codify, install
 from .visualize import write_interactive_html
 from .workflows import mine, read_claude_code, read_generic, request_rows
 from .worth_it import compare as compare_workflows, judge
@@ -156,6 +157,14 @@ def _parser() -> argparse.ArgumentParser:
     wfc_parser.add_argument("before")
     wfc_parser.add_argument("after")
     wfc_parser.add_argument("--recommendation", required=True, help="recommendation id from the before document")
+    wfc_parser.add_argument("--after-family", help="read the after side from this family (e.g. skill:<name> once a codified skill is in use)")
+    cod_parser = sub.add_parser("codify", help="write one portable SKILL.md for a workflow family (the baseline version)")
+    cod_parser.add_argument("workflows", help="workflows.json from before the skill existed")
+    cod_parser.add_argument("--family", required=True, help="family to codify, e.g. ship:edit-test")
+    cod_parser.add_argument("--out", required=True, help="skills source folder, e.g. ~/code/atoz/skills")
+    cod_parser.add_argument("--name", help="skill name (default: from the family)")
+    cod_parser.add_argument("--install", action="store_true",
+                            help="link the skill folder into the Claude Code, Codex, Cursor and Pi skills directories")
     lc_parser = sub.add_parser("label-corrections",
                                help="write a content-free sheet of turns for a human to label (user-correction detectors)")
     lc_parser.add_argument("--claude-code", metavar="DIR", required=True, help="Claude Code transcripts root")
@@ -274,6 +283,16 @@ def main(argv: list[str] | None = None) -> int:
                 (destination / "requests.json").write_text(json.dumps(request_rows(requests), indent=2) + "\n", encoding="utf-8")
             print(f"{doc['gate']['headline']}. wrote {destination / 'workflows.html'}")
             return 0
+        if args.command == "codify":
+            source = Path(args.workflows).expanduser()
+            made = codify(json.loads(source.read_text(encoding="utf-8")), args.family, Path(args.out), args.name, source)
+            print(f"wrote {made['folder']}/SKILL.md")
+            if args.install:
+                for tool, outcome in install(Path(made["folder"])).items():
+                    print(f"  {tool}: {outcome}")
+            if made.get("compare"):
+                print(f"measure later: {made['compare']}")
+            return 0
         if args.command == "workflows-compare":
             before = json.loads(Path(args.before).read_text(encoding="utf-8"))
             after = json.loads(Path(args.after).read_text(encoding="utf-8"))
@@ -281,7 +300,7 @@ def main(argv: list[str] | None = None) -> int:
                         if (f.get("recommendation") or {}).get("id") == args.recommendation), None)
             if rec is None:
                 raise ValueError(f"no recommendation '{args.recommendation}' in {args.before}")
-            result = compare_workflows(before, after, rec)
+            result = compare_workflows(before, after, rec, args.after_family)
             print(json.dumps(result, indent=2, sort_keys=True))
             return 0 if result["pass"] else 1
         if args.command == "label-corrections":

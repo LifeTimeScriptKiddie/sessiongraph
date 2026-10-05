@@ -164,14 +164,25 @@ def read_metric(doc: dict[str, Any], key: str) -> float | None:
     return None
 
 
-def compare(before: dict[str, Any], after: dict[str, Any], recommendation: dict[str, Any]) -> dict[str, Any]:
-    """Keep or roll back one recommendation: its metric must move its way and its guard must hold."""
+def _rename(key: str, family: str | None) -> str:
+    """`families.<old>.<field>` -> `families.<family>.<field>` (the after side of a codified skill)."""
+    parts = key.split(".")
+    return f"families.{family}.{parts[-1]}" if family and len(parts) >= 3 and parts[0] == "families" else key
+
+
+def compare(before: dict[str, Any], after: dict[str, Any], recommendation: dict[str, Any],
+            after_family: str | None = None) -> dict[str, Any]:
+    """Keep or roll back one recommendation: its metric must move its way and its guard must hold.
+
+    after_family reads the after side from another family, e.g. `skill:<name>` once a codified
+    skill anchors the requests that used to land in the mined family.
+    """
     gates = []
     for role in ("metric", "guard"):
         spec = recommendation.get(role)
         if not spec:
             continue
-        b, a = read_metric(before, spec["key"]), read_metric(after, spec["key"])
+        b, a = read_metric(before, spec["key"]), read_metric(after, _rename(spec["key"], after_family))
         if b is None or a is None:
             gates.append({"gate": role, "key": spec["key"], "pass": False, "detail": "missing in before or after"})
             continue
@@ -182,7 +193,7 @@ def compare(before: dict[str, Any], after: dict[str, Any], recommendation: dict[
     comparable = True
     if fam:
         nb = read_metric(before, f"families.{fam}.requests") or 0
-        na = read_metric(after, f"families.{fam}.requests") or 0
+        na = read_metric(after, f"families.{after_family or fam}.requests") or 0
         comparable = na >= THRESHOLDS["min_requests"] and nb >= THRESHOLDS["min_requests"]
         gates.append({"gate": "comparable workload", "before": nb, "after": na, "pass": comparable})
     passed = bool(gates) and all(g["pass"] for g in gates)
