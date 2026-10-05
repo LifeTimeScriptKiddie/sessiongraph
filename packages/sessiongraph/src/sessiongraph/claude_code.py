@@ -32,6 +32,7 @@ from typing import Any, Callable, Iterable
 
 from .model import Event, Session
 from .privacy import fingerprint, sanitize
+from .repos import touched_repo
 from .workflows import _BORING_COMMANDS, _COMMAND, _ts, phase_of
 
 READER = "claude-code-v1"
@@ -133,6 +134,8 @@ def _read_events(path: Path, since: datetime | None, prefix: str = "") -> tuple[
                           timestamp=ts, text=_argument(tool_input),
                           signature=fingerprint("tool_call", name, safe_args),
                           metadata={"phase": phase_of(name, tool_input),
+                                    "touched_repo": touched_repo(name, tool_input, rec.get("cwd")
+                                                                 if isinstance(rec.get("cwd"), str) else None),
                                     "skill": skill if isinstance(skill, str) and re.fullmatch(r"[\w:.-]{1,60}", skill)
                                     else None}))
             continue

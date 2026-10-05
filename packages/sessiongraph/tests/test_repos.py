@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from sessiongraph.cli import main
-from sessiongraph.repos import UNKNOWN, repo_of, slugs
+from sessiongraph.repos import UNKNOWN, git_root, repo_of, slugs, touched_folder
 from sessiongraph.workflows import Request, mine, read_claude_code
 
 
@@ -39,7 +39,7 @@ class RepoTests(unittest.TestCase):
         self.wt_b = self.main / ".claude" / "worktrees" / "b"
         _git(self.main, "worktree", "add", "-q", "-b", "a", str(self.wt_a))
         _git(self.main, "worktree", "add", "-q", "-b", "b", str(self.wt_b))
-        repo_of.cache_clear()
+        git_root.cache_clear()
 
     def test_worktrees_and_subfolders_resolve_to_the_main_repo(self):
         for cwd in (self.main, self.main / "sub", self.wt_a, self.wt_b):
@@ -76,6 +76,47 @@ class RepoTests(unittest.TestCase):
         doc = json.loads((out / "workflows.json").read_text())
         self.assertEqual(doc["requests"], 1)
         self.assertEqual([f["family"] for f in doc["families"]], ["proj/lookup"])
+
+
+class TouchedRepoTests(RepoTests):
+    def test_session_from_a_parent_folder_takes_the_repo_its_tools_touched(self):
+        root = self.tmp / "projects"
+        path = root / "p" / "s.jsonl"
+        lines = [json.dumps({"type": "user", "timestamp": "2026-10-01T10:00:00Z", "cwd": str(self.tmp),
+                             "sessionId": "s", "message": {"role": "user", "content": "do it"}})]
+        calls = [("Read", {"file_path": str(self.wt_a / "x.py")}), ("Bash", {"command": f"cd {self.main} && ls"}),
+                 ("Bash", {"command": f"git -C {self.wt_b} status"}), ("Read", {"file_path": str(self.tmp / "y.txt")})]
+        for i, (tool, inp) in enumerate(calls):
+            lines.append(json.dumps({"type": "assistant", "timestamp": "2026-10-01T10:00:01Z", "cwd": str(self.tmp),
+                                     "message": {"id": f"m{i}", "usage": {"output_tokens": 1}, "content": [
+                                         {"type": "tool_use", "id": f"t{i}", "name": tool, "input": inp}]}}))
+        path.parent.mkdir(parents=True)
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        [req] = read_claude_code(root)
+        self.assertEqual((req.repo, req.repo_source), (str(self.main), "touched"))
+
+    def test_no_clear_majority_keeps_the_folder(self):
+        other = self.tmp / "other"
+        other.mkdir()
+        _git(other, "init", "-q")
+        root = self.tmp / "projects"
+        path = root / "p" / "s.jsonl"
+        lines = [json.dumps({"type": "user", "timestamp": "2026-10-01T10:00:00Z", "cwd": str(self.tmp),
+                             "sessionId": "s", "message": {"role": "user", "content": "do it"}})]
+        for i, folder in enumerate((self.main, other)):
+            lines.append(json.dumps({"type": "assistant", "timestamp": "2026-10-01T10:00:01Z", "cwd": str(self.tmp),
+                                     "message": {"id": f"m{i}", "usage": {"output_tokens": 1}, "content": [
+                                         {"type": "tool_use", "id": f"t{i}", "name": "Read",
+                                          "input": {"file_path": str(folder / "a.py")}}]}}))
+        path.parent.mkdir(parents=True)
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        [req] = read_claude_code(root)
+        self.assertEqual((req.repo, req.repo_source), (str(self.tmp), "folder"))
+
+    def test_touched_folder_reads_paths_and_shell_folders(self):
+        self.assertEqual(touched_folder("Bash", {"command": "git -C '/a/b' log"}, None), "/a/b")
+        self.assertEqual(touched_folder("Read", {"file_path": "rel/x.py"}, "/base"), "/base/rel")
+        self.assertIsNone(touched_folder("Bash", {"command": "ls"}, "/base"))
 
 
 class SlugTests(unittest.TestCase):

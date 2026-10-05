@@ -62,7 +62,12 @@ class PhaseTests(unittest.TestCase):
         self.assertEqual(family_of(r(["explore", "explore"])), "lookup")
         self.assertEqual(family_of(r(["explore", "web"])), "research")
         self.assertEqual(family_of(r(["explore", "edit", "test"])), "edit-test")
-        self.assertEqual(family_of(r(["edit", "test", "commit"])), "ship")
+        self.assertEqual(family_of(r(["edit", "test", "commit"])), "ship:edit-test")
+        self.assertEqual(family_of(r(["explore", "edit", "build", "commit", "shell"])), "ship:edit-test")
+        self.assertEqual(family_of(r(["edit", "commit", "test"])), "ship:edit-untested")  # the test came after
+        self.assertEqual(family_of(r(["explore", "shell", "commit"])), "ship:shell")
+        self.assertEqual(family_of(r(["explore", "commit"])), "ship:commit-only")
+        self.assertEqual(family_of(r(["test", "commit"])), "ship:commit-only")
         self.assertEqual(family_of(r(["edit"], anchor="skill:code-review")), "skill:code-review")
 
     def test_typical_path_follows_the_heaviest_edges_without_loops(self):
@@ -121,7 +126,7 @@ class ReaderAndGateTests(unittest.TestCase):
         self.assertIn("50% fewer output tokens", " ".join(fams["lookup"]["reasons"]))
         self.assertEqual(fams["edit"]["verdict"], "engineer")
         self.assertEqual(fams["edit"]["recommendation"]["metric"]["key"], "families.edit.friction_rate")
-        self.assertEqual(fams["ship"]["verdict"], "observe")  # failing tests along the way are not friction
+        self.assertEqual(fams["ship:edit-test"]["verdict"], "observe")  # failing tests along the way are not friction
         self.assertIn("worth engineering", doc["gate"]["headline"])
 
     def test_not_enough_evidence_says_so(self):

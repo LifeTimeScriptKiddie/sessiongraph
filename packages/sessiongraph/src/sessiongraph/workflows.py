@@ -28,7 +28,7 @@ from pathlib import Path
 from statistics import median
 from typing import Any, Iterable
 
-from .repos import UNKNOWN, display, repo_of, slugs
+from .repos import UNKNOWN, display, git_root, repo_of, slugs
 
 SCHEMA = "sessiongraph.workflows.v1"
 PHASES = ("explore", "edit", "test", "build", "commit", "delegate", "subagent", "web", "skill", "shell")
@@ -92,6 +92,9 @@ class Request:
     duration_ms: int = 0
     repo: str = "unknown"  # git root of the session's cwd (repos.repo_of); worktrees count as their main repo
     branch: str | None = None
+    # how repo was found: "cwd" (a git repo), "touched" (cwd outside git; most tool calls touched this repo),
+    # "folder" (cwd outside git, no single touched repo) or "unknown" (cwd gone)
+    repo_source: str = "unknown"
 
     @property
     def shape(self) -> tuple[str, ...]:
@@ -144,6 +147,7 @@ def _read_claude_file(path: Path, since: datetime | None) -> list[Request]:
                       anchor=f"/{command}" if command else None, repo=repo_of(part.turn.metadata.get("cwd")),
                       branch=part.turn.metadata.get("git_branch"))
         phase_of_call: dict[str, str] = {}
+        touched: Counter[str] = Counter()
         last_tool_error = False
         for event in part.events:
             if event.kind == "message" and event.role == "user" and is_boring(event):
@@ -164,6 +168,8 @@ def _read_claude_file(path: Path, since: datetime | None) -> list[Request]:
                 if phase:
                     req.phases.append(phase)
                     phase_of_call[event.id] = phase
+                if event.metadata.get("touched_repo"):
+                    touched[event.metadata["touched_repo"]] += 1
             elif event.kind == "tool_result":
                 last_tool_error = event.is_error
                 if last_tool_error:
@@ -172,12 +178,27 @@ def _read_claude_file(path: Path, since: datetime | None) -> list[Request]:
                     req.error_phases[ph] = req.error_phases.get(ph, 0) + 1
                     if ph not in EXPECTED_FAILURE_PHASES:
                         req.friction_errors += 1
+        _settle_repo(req, part.turn.metadata.get("cwd"), touched)
         if req.steps or req.output_tokens:
             if started and last:
                 req.duration_ms = max(0, int((last - started).total_seconds() * 1000))
             req.ended_in_error = last_tool_error and req.steps > 0
             out.append(req)
     return out
+
+
+def _settle_repo(req: Request, cwd: str | None, touched: Counter[str]) -> None:
+    """Keep the cwd's repo when it is one; otherwise use the repo most tool calls touched, if it is a clear majority."""
+    if req.repo == UNKNOWN:
+        req.repo_source = "unknown"
+    elif git_root(cwd):
+        req.repo_source = "cwd"
+    else:
+        req.repo_source = "folder"
+    if req.repo_source != "cwd" and touched:
+        repo, hits = touched.most_common(1)[0]
+        if hits * 2 > sum(touched.values()):
+            req.repo, req.repo_source = repo, "touched"
 
 
 def read_generic(paths: Iterable[str | Path]) -> list[Request]:
@@ -230,7 +251,7 @@ def family_of(req: Request) -> str:
     if "delegate" in s and not ({"edit", "test"} & s):
         return "delegate"
     if "commit" in s:
-        return "ship"
+        return ship_kind(req.phases)
     if "edit" in s and "test" in s:
         return "edit-test"
     if "edit" in s:
@@ -238,6 +259,22 @@ def family_of(req: Request) -> str:
     if "test" in s or "build" in s:
         return "verify"
     return "shell"
+
+
+def ship_kind(phases: list[str]) -> str:
+    """Split ship by what ran before the first commit (explore, web, delegate... do not count).
+
+    - ship:edit-test       edited, then tested or built
+    - ship:edit-untested   edited, nothing tested or built (a commit no check covered)
+    - ship:shell           no edit; shell commands (scripts, config, generated files)
+    - ship:commit-only     nothing changed here first: committing earlier work (a test run alone is allowed)
+    """
+    before = set(phases[:phases.index("commit")])
+    if "edit" in before:
+        return "ship:edit-test" if before & {"test", "build"} else "ship:edit-untested"
+    if "shell" in before:
+        return "ship:shell"
+    return "ship:commit-only"
 
 
 def _entropy(counts: Iterable[int]) -> float:
@@ -333,6 +370,7 @@ def mine(requests: list[Request], by_repo: bool = False) -> dict[str, Any]:
         "requests": len(requests),
         "by_repo": by_repo,
         "repos": {display(k): v for k, v in Counter(r.repo for r in requests).most_common()},
+        "repo_sources": dict(Counter(r.repo_source for r in requests).most_common()),
         "sessions": len({r.session for r in requests}),
         "days": sorted({r.day for r in requests if r.day}),
         "families": families,

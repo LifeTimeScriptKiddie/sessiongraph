@@ -4,15 +4,19 @@ The repo is the git root of the transcript's `cwd`, so linked worktrees of one
 repo (`agentctl/dev-*`, `.claude/worktrees/*`) resolve to the main checkout and
 count as one repo. A `cwd` that no longer exists is "unknown": it is never
 guessed from the directory name. An existing directory outside git is its own
-location, reported as-is.
+location, reported as-is, unless the request's tool calls show which repo it
+worked in (a session started in a parent folder such as ~/code).
 """
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from pathlib import Path
 
 UNKNOWN = "unknown"
+# `cd DIR && ...` or `git -C DIR ...`: the folder a shell command ran in
+_FOLDER_IN_COMMAND = re.compile(r"^\s*cd\s+(\S+)|\bgit\s+-C\s+(\S+)")
 
 
 def _main_checkout(dot_git: Path) -> Path:
@@ -37,18 +41,51 @@ def _main_checkout(dot_git: Path) -> Path:
 
 
 @lru_cache(maxsize=None)
+def git_root(folder: str | None) -> str | None:
+    """Main checkout of the git repo containing `folder`, or None when it is gone or outside git."""
+    if not folder:
+        return None
+    here = Path(folder).expanduser()
+    if not here.is_dir():
+        return None
+    here = here.resolve()
+    for candidate in (here, *here.parents):
+        if (candidate / ".git").exists():
+            return str(_main_checkout(candidate / ".git"))
+    return None
+
+
 def repo_of(cwd: str | None) -> str:
     """Absolute path of the repo for `cwd`, or UNKNOWN when it is missing or gone."""
-    if not cwd:
+    if not cwd or not Path(cwd).expanduser().is_dir():
         return UNKNOWN
-    here = Path(cwd).expanduser()
-    if not here.is_dir():
-        return UNKNOWN
-    here = here.resolve()
-    for folder in (here, *here.parents):
-        if (folder / ".git").exists():
-            return str(_main_checkout(folder / ".git"))
-    return str(here)
+    return git_root(cwd) or str(Path(cwd).expanduser().resolve())
+
+
+def touched_folder(tool: str, tool_input: dict, cwd: str | None) -> str | None:
+    """The folder a tool call worked in, from its recorded arguments (inspected, never stored)."""
+    raw, is_folder = None, False
+    for key in ("file_path", "notebook_path", "path"):
+        if isinstance(tool_input.get(key), str):
+            raw = tool_input[key]
+            break
+    if raw is None and tool == "Bash" and isinstance(tool_input.get("command"), str):
+        match = _FOLDER_IN_COMMAND.search(tool_input["command"])
+        raw = (match.group(1) or match.group(2)).strip("'\"") if match else None
+        is_folder = True
+    if not raw:
+        return None
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        if not cwd:
+            return None
+        path = Path(cwd) / path
+    return str(path if is_folder or path.is_dir() else path.parent)
+
+
+def touched_repo(tool: str, tool_input: dict, cwd: str | None) -> str | None:
+    """The git repo a tool call touched, when its arguments name a path inside one."""
+    return git_root(touched_folder(tool, tool_input, cwd))
 
 
 def display(repo: str) -> str:
