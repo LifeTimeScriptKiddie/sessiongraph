@@ -149,7 +149,7 @@ Read [PRIVACY.md](PRIVACY.md) before exporting real sessions.
 ```sh
 npm test
 npm run check:public
-uv --directory packages/sessiongraph run --extra dev --frozen python -m unittest discover -s tests -q
+uv --directory packages/sessiongraph run --extra dev --frozen pytest -q
 npm run test:integration
 uv --directory packages/sessiongraph run --extra dev --frozen python -m build --no-isolation
 ```

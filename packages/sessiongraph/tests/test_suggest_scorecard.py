@@ -28,7 +28,7 @@ def _load_cases() -> list[dict]:
 
 
 class SuggestMatrixTests(unittest.TestCase):
-    @patch("sessiongraph.suggest.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
+    @patch("sessiongraph.suggest.rules.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
     def test_matrix_matches_goldens(self):
         for case in _load_cases():
             with self.subTest(case=case["id"]):
@@ -81,7 +81,7 @@ class SuggestMatrixTests(unittest.TestCase):
             )
             self.assertIn(expected["pi_meta_name"], js)
 
-    @patch("sessiongraph.suggest.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
+    @patch("sessiongraph.suggest.rules.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
     def test_multi_fault_contract_spine_beats_retry_guard(self):
         """pipeline_contract primary keeps contract phases; RetryBudget before VerifyArtifacts."""
         analysis = json.loads(

@@ -37,6 +37,10 @@ sessiongraph = "sessiongraph.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "graph: optional NetworkX / PyVis graph metrics and visualization tests",
+]
 
 [tool.uv]
 exclude-newer = "2 weeks"

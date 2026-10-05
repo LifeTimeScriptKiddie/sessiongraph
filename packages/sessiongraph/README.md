@@ -260,8 +260,11 @@ These are review signals, not diagnoses of model intent. `workflow_health` is a 
 ## Development
 
 ```bash
-PYTHONPATH=src python -m unittest discover -s tests -v
-PYTHONPATH=src python -m compileall -q src tests
+uv run --extra dev pytest -q
+uv run --extra dev python -m compileall -q src tests
 ```
+
+Graph/visual tests skip automatically when optional `networkx` / `pyvis` extras are not installed.
+Detector defaults live in `detector_params.v1.json`; labeled-corpus summary in `tests/fixtures/verify-labeled-summary.v1.json`.
 
 See [RESEARCH.md](RESEARCH.md) for similar projects, design boundaries, and sources.

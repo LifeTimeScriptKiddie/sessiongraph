@@ -21,7 +21,7 @@ sessiongraph verify-detectors corrections.jsonl --require behavior
 
 ## First result: no correction detector passes yet
 
-On one developer's 320 human-typed Claude Code turns (69 labeled by the human, 36 settled by code):
+On one developer's 320 human-typed Claude Code turns (69 labeled by the human, 36 settled by code). The aggregate numbers are checked in `packages/sessiongraph/tests/fixtures/verify-labeled-summary.v1.json`; a redacted sample sheet is `verify-labeled-sample.v1.jsonl`. Tunable defaults are in `packages/sessiongraph/detector_params.v1.json`.
 
 | Detector | Precision | Estimated recall | Verdict |
 | --- | --- | --- | --- |

@@ -5,6 +5,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from .detector_params import repeated_action_params
 from .model import Event, Session
 
 
@@ -77,7 +78,14 @@ CORRECTION_TERMS = (
 )
 
 
-def _repeated(events: list[Event], minimum: int = 3, window: int = 8) -> list[Finding]:
+def _repeated(
+    events: list[Event],
+    minimum: int | None = None,
+    window: int | None = None,
+) -> list[Finding]:
+    default_minimum, default_window = repeated_action_params()
+    minimum = default_minimum if minimum is None else minimum
+    window = default_window if window is None else window
     findings: list[Finding] = []
     actions = [event for event in events if event.kind == "tool_call"]
     failed_calls = {

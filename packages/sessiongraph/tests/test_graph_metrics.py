@@ -1,7 +1,11 @@
+import importlib.util
 import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+
+_HAS_NETWORKX = importlib.util.find_spec("networkx") is not None
+_HAS_PYVIS = importlib.util.find_spec("pyvis") is not None
 
 from sessiongraph.graph_metrics import measure_graph
 from sessiongraph.visualize import write_interactive_html
@@ -14,6 +18,7 @@ def analysis(nodes, edges):
     }
 
 
+@unittest.skipUnless(_HAS_NETWORKX, "networkx not installed (pip install sessiongraph[graph])")
 class GraphMetricsTests(unittest.TestCase):
     def test_reachability_and_artifact_verification_coverage(self):
         value = analysis([
@@ -67,6 +72,7 @@ class GraphMetricsTests(unittest.TestCase):
         self.assertEqual(result["metrics"]["request_roots"], 1)
         self.assertEqual(result["metrics"]["request_output_coverage"], 1.0)
 
+    @unittest.skipUnless(_HAS_PYVIS, "pyvis not installed (pip install sessiongraph[visual])")
     def test_visualization_is_self_contained_and_content_free(self):
         value = analysis([
             {"id": "request</script><script>bad()", "kind": "user_request", "role": "user",

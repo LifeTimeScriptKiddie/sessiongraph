@@ -1,0 +1,7 @@
+{"schema": "sessiongraph.labels.v1", "kind": "header", "unit": "turn", "question": "Did the user correct the agent?", "turns": 6, "authors": {"human": 4, "agent": 2}, "unflagged_human": 2, "sample_size": 1, "seed": 7, "detectors": ["keyword_human", "behavior"]}
+{"turn_id": "t1", "path": "tests/fixtures/pi-loop.jsonl", "author": "human", "author_reason": "user", "flags": {"keyword_human": true, "behavior": false}, "stratum": "flagged", "label": true, "labeled_by": "human"}
+{"turn_id": "t2", "path": "tests/fixtures/pi-loop.jsonl", "author": "human", "author_reason": "user", "flags": {"keyword_human": true, "behavior": false}, "stratum": "flagged", "label": false, "labeled_by": "human"}
+{"turn_id": "t3", "path": "tests/fixtures/pi-loop.jsonl", "author": "human", "author_reason": "user", "flags": {"keyword_human": false, "behavior": true}, "stratum": "flagged", "label": true, "labeled_by": "human"}
+{"turn_id": "t4", "path": "tests/fixtures/pi-loop.jsonl", "author": "agent", "author_reason": "task", "flags": {"keyword_human": false, "behavior": false}, "stratum": "flagged", "label": null, "labeled_by": "code"}
+{"turn_id": "t5", "path": "tests/fixtures/pi-loop.jsonl", "author": "human", "author_reason": "user", "flags": {"keyword_human": false, "behavior": false}, "stratum": "sample", "label": false, "labeled_by": "human"}
+{"turn_id": "t6", "path": "tests/fixtures/pi-loop.jsonl", "author": "human", "author_reason": "user", "flags": {"keyword_human": false, "behavior": false}, "stratum": "sample", "label": false, "labeled_by": "human"}

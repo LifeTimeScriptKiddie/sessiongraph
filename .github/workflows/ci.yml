@@ -26,7 +26,7 @@ jobs:
           python3 scripts/test_public_source.py
           npm run check:public
       - name: SessionGraph tests
-        run: uv --directory packages/sessiongraph run --extra dev --frozen python -m unittest discover -s tests -q
+        run: uv --directory packages/sessiongraph run --extra dev --frozen pytest -q
       - name: Cross-language contract
         run: npm run test:integration
 
@@ -44,7 +44,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - uses: astral-sh/setup-uv@v6
       - name: Unit tests
-        run: uv --directory packages/sessiongraph run --extra dev --frozen python -m unittest discover -s tests -q
+        run: uv --directory packages/sessiongraph run --extra dev --frozen pytest -q
       - name: Compile check
         run: uv --directory packages/sessiongraph run --extra dev --frozen python -m compileall -q src tests
       - name: Build distributions

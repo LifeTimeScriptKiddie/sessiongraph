@@ -46,7 +46,7 @@ class SuggestWorkflowTests(unittest.TestCase):
         path.write_text(json.dumps(body or FIXTURE_ANALYSIS, indent=2) + "\n", encoding="utf-8")
         return path
 
-    @patch("sessiongraph.suggest.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
+    @patch("sessiongraph.suggest.rules.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
     def test_markdown_target(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -173,7 +173,7 @@ class SuggestWorkflowTests(unittest.TestCase):
             # Content-free: fixture summaries must not leak into the sketch as raw transcript.
             self.assertNotIn("secret-user-utterance", js)
 
-    @patch("sessiongraph.suggest.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
+    @patch("sessiongraph.suggest.rules.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
     def test_claude_does_not_embed_transcript_text(self):
         body = dict(FIXTURE_ANALYSIS)
         body["findings"] = [
@@ -209,7 +209,7 @@ class SuggestWorkflowTests(unittest.TestCase):
             self.assertIn("repeatedFailureRounds: 2", run_yaml)
             self.assertIn("never auto-runs agentctl", run_yaml)
 
-    @patch("sessiongraph.suggest.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
+    @patch("sessiongraph.suggest.rules.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
     def test_severity_spine_dead_end_owns_handoff(self):
         body = {
             "schema_version": 1,
@@ -314,7 +314,7 @@ class SuggestWorkflowTests(unittest.TestCase):
                     0,
                 )
 
-    @patch("sessiongraph.suggest.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
+    @patch("sessiongraph.suggest.rules.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
     def test_report_dir_and_jsonl_inputs(self):
         fixture = Path(__file__).parent / "fixtures" / "pi-loop.jsonl"
         with TemporaryDirectory() as directory:

@@ -1,0 +1,29 @@
+{
+  "schema": "sessiongraph.verify-labeled-summary.v1",
+  "provenance": "First correction-detector labeling pass documented in docs/VERIFY.md",
+  "human_typed_turns": 320,
+  "human_labels": 69,
+  "code_settled_labels": 36,
+  "detectors": {
+    "keyword_any_author": {
+      "precision": 0.11,
+      "recall_estimated": 0.27,
+      "verdict": "unverified"
+    },
+    "keyword_human": {
+      "precision": 0.47,
+      "recall_estimated": 0.3,
+      "verdict": "unverified"
+    },
+    "behavior": {
+      "precision": 0.67,
+      "recall_estimated": 0.43,
+      "verdict": "unverified"
+    },
+    "behavior_or_keyword_human": {
+      "precision": 0.55,
+      "recall_estimated": 0.69,
+      "verdict": "unverified"
+    }
+  }
+}

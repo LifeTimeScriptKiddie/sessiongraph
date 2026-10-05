@@ -33,15 +33,16 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from .analyze import CORRECTION_TERMS, _alternating, _repeated
+from .detector_params import revert_window, same_tool_failing_minimum, verify_thresholds
 from .claude_code import author_of, read_transcript, segment, transcripts  # noqa: F401  (author_of re-exported)
 from .model import Event
 
 SCHEMA = "sessiongraph.labels.v1"
 REPORT_SCHEMA = "sessiongraph.detector-verification.v1"
-THRESHOLDS: dict[str, float] = {"min_labeled_flagged": 10, "precision": 0.8, "recall": 0.5}
+THRESHOLDS: dict[str, float] = verify_thresholds()
 
 _REVERT = re.compile(r"\bgit (checkout --|restore\b|revert\b|reset --hard\b|stash\b)")
-REVERT_WINDOW = 5  # tool calls after the turn that may count as reverting work
+REVERT_WINDOW = revert_window()  # tool calls after the turn that may count as reverting work
 
 
 @dataclass(slots=True)
@@ -147,7 +148,9 @@ def read_claude_requests(root: str | Path, since: datetime | None = None) -> lis
     return out
 
 
-def _same_tool_failing(request: Request, minimum: int = 3) -> list[str]:
+def _same_tool_failing(request: Request, minimum: int | None = None) -> list[str]:
+    if minimum is None:
+        minimum = same_tool_failing_minimum()
     """Candidate: one tool fails >= 3 times in a request, whatever its arguments.
 
     The analyze detectors need identical calls; agents usually change arguments
