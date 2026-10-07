@@ -543,6 +543,12 @@ def render_agentctl(
         "defines measurable success, falsification, and rollback criteria; preserves",
         "local-only processing; and makes no claims about hidden model reasoning.",
         "",
+        "**Completion proof** — Name the deliverable paths plus verification artifacts that",
+        "must exist on disk before the run is accepted (chat summaries alone do not count).",
+        "",
+        "**Claim→source** — Every material claim cites a finding code or event ID already",
+        "present in `task.md` / the analysis; unsupported claims stay marked unresolved.",
+        "",
     ]
     if primary.requires_handoff or any(g.requires_handoff for g in guards):
         rubric_lines.append("When `dead_end` is in scope, handoff headings (state / blocker / next safe action) are mandatory.")

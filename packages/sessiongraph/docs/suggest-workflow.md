@@ -1,7 +1,7 @@
 # `suggest-workflow`
 
 
-**Status:** implemented (`suggest-map-v1`) in `src/sessiongraph/suggest.py`.
+**Status:** implemented (`suggest-map-v1`) in `src/sessiongraph/suggest/`.
 
 ## CLI
 
@@ -30,6 +30,17 @@ findings remain, the output is `SKIPPED.md`.
 | `agentctl` | `task.md` + `run.yaml` + `rubric.md` (no auto-run) |
 
 Always: `manifest.json`, `rationale.md`, provenance `analysis.json`.
+
+`rationale.md` includes two advise-only sections:
+
+- **Control-plane recommendations (advise only)** — maps the suggested topology onto
+  graph-engineering primitives (nodes, edges, state, routes, joins, exits).
+- **Harness layers (advise only)** — maps the same topology onto the seven-layer long-run
+  harness (workspace facts → procedure → sources → execution → evidence reviewer → effort →
+  completion proof). See also `agentctl/dev/docs/LONG-RUN-HARNESS.md`.
+
+SessionGraph still does not govern execution; agentctl, the harness, or a human apply, park,
+approve, or cancel.
 
 ### `--target pi` contract
 

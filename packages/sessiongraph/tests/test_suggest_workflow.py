@@ -67,6 +67,17 @@ class SuggestWorkflowTests(unittest.TestCase):
             self.assertEqual(manifest["mapping_version"], "suggest-map-v1")
             self.assertIn("repeated_action", manifest["findings_used"])
             self.assertTrue((out / "rationale.md").is_file())
+            rationale = (out / "rationale.md").read_text(encoding="utf-8")
+            self.assertIn("Control-plane recommendations (advise only)", rationale)
+            self.assertIn("**Nodes**", rationale)
+            self.assertIn("**Exit rules**", rationale)
+            self.assertIn("Harness layers (advise only)", rationale)
+            for label in ("**L1 ", "**L2 ", "**L3 ", "**L4 ", "**L5 ", "**L6 ", "**L7 "):
+                self.assertIn(label, rationale)
+            self.assertIn("saved deliverables + verification artifacts", rationale)
+            self.assertIn("SessionGraph recommends only", rationale)
+            self.assertNotIn("enforces", rationale.lower())
+            self.assertNotIn("blocks", rationale.lower())
             self.assertTrue((out / "analysis.json").is_file())
 
     def test_pi_target(self):
@@ -208,6 +219,9 @@ class SuggestWorkflowTests(unittest.TestCase):
             run_yaml = (out / "run.yaml").read_text(encoding="utf-8")
             self.assertIn("repeatedFailureRounds: 2", run_yaml)
             self.assertIn("never auto-runs agentctl", run_yaml)
+            rubric = (out / "rubric.md").read_text(encoding="utf-8")
+            self.assertIn("**Completion proof**", rubric)
+            self.assertIn("**Claim→source**", rubric)
 
     @patch("sessiongraph.suggest.rules.VERIFIED_HEURISTICS", AS_IF_VERIFIED)
     def test_severity_spine_dead_end_owns_handoff(self):
@@ -243,9 +257,72 @@ class SuggestWorkflowTests(unittest.TestCase):
             rationale = (out / "rationale.md").read_text(encoding="utf-8")
             self.assertIn("### Spine: `dead_end`", rationale)
             self.assertIn("### Guard: `user_correction`", rationale)
+            self.assertIn("Harness layers (advise only)", rationale)
+            for label in ("**L1 ", "**L2 ", "**L3 ", "**L4 ", "**L5 ", "**L6 ", "**L7 "):
+                self.assertIn(label, rationale)
+            self.assertIn("saved deliverables + verification artifacts", rationale)
+            self.assertIn("because `dead_end`", rationale)
             workflow = (out / "workflow.md").read_text(encoding="utf-8")
             self.assertIn("Handoff", workflow)
             self.assertIn("PreflightChecklist", workflow)
+
+    def test_harness_layers_skipped_pointer_only(self):
+        body = {
+            "schema_version": 1,
+            "session": {"id": "ok", "format": "pi-v3", "source": "x", "metadata": {}},
+            "metrics": {"workflow_health": 100, "tool_calls": 0, "events": 2, "branches": 0},
+            "findings": [],
+            "graph": {"nodes": [], "edges": []},
+        }
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            analysis = self._write_analysis(root, body)
+            out = root / "out"
+            self.assertEqual(
+                main(["suggest-workflow", str(analysis), "--target", "markdown", "--out", str(out)]),
+                0,
+            )
+            rationale = (out / "rationale.md").read_text(encoding="utf-8")
+            self.assertIn("Harness layers (advise only)", rationale)
+            self.assertIn("LONG-RUN-HARNESS.md", rationale)
+            self.assertNotIn("**L1 ", rationale)
+            self.assertNotIn("**L7 ", rationale)
+
+    def test_harness_layers_hold_back_repeated_action_driver(self):
+        """Default VERIFIED_HEURISTICS is empty, so repeated_action must not drive L-lines."""
+        body = {
+            "schema_version": 1,
+            "session": {"id": "hold", "format": "pi-v3", "source": "x", "metadata": {}},
+            "metrics": {"workflow_health": 70, "tool_calls": 3, "events": 6, "branches": 0},
+            "findings": [
+                {
+                    "code": "repeated_action",
+                    "severity": "warning",
+                    "summary": "loop",
+                    "evidence": ["t1", "t2", "t3"],
+                    "recommendation": "budget",
+                },
+                {
+                    "code": "errors",
+                    "severity": "warning",
+                    "summary": "err",
+                    "evidence": ["e1"],
+                    "recommendation": "classify",
+                },
+            ],
+            "graph": {"nodes": [], "edges": []},
+        }
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            analysis = self._write_analysis(root, body)
+            out = root / "out"
+            self.assertEqual(
+                main(["suggest-workflow", str(analysis), "--target", "markdown", "--out", str(out)]),
+                0,
+            )
+            rationale = (out / "rationale.md").read_text(encoding="utf-8")
+            self.assertIn("because `errors`", rationale)
+            self.assertNotIn("because `repeated_action`", rationale)
 
     def test_no_findings_skips_without_include_healthy(self):
         body = {
