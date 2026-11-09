@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sessiongraph.failure-tags.v1",
+  "title": "SessionGraph failure tags v1",
+  "description": "Content-free failure tags shared by agentctl (TS) and SessionGraph (Python).",
+  "type": "object",
+  "required": ["schema", "tags"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "sessiongraph.failure-tags.v1" },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "provider_aup",
+          "aup_block_on_write",
+          "decomposed_to_luna",
+          "stayed_on_daybreak",
+          "empty_success",
+          "model_drift_candidate",
+          "policy_remap",
+          "usage_limit",
+          "legacy_relabel"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "job_id": { "type": ["string", "null"] },
+    "failureClass": { "type": ["string", "null"] },
+    "agent": { "type": ["string", "null"] },
+    "model": { "type": ["string", "null"] },
+    "role": { "type": ["string", "null"] },
+    "legacy_relabel": { "type": "boolean" }
+  }
+}

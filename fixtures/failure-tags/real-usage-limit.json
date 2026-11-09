@@ -1,0 +1,15 @@
+{
+  "id": "job_fixture_usage_limit",
+  "kind": "delegate",
+  "ask": {
+    "agent": "codex",
+    "model": "gpt-6-luna",
+    "ok": false,
+    "failureClass": "usage_limit",
+    "text": "You have hit your usage limit. Try again in 30 minutes.",
+    "evidence": ""
+  },
+  "expected_tags": [
+    "usage_limit"
+  ]
+}

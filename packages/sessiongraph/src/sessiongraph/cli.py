@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from .analyze import analyze, compare
 from .graph_metrics import measure_graph
@@ -190,9 +191,22 @@ def _parser() -> argparse.ArgumentParser:
     vo_parser.add_argument("--out", help="write the report JSON here")
     rh_parser = sub.add_parser("reader-health",
                                help="check that the Claude Code reader sees transcripts as written (format drift)")
-    rh_parser.add_argument("--claude-code", metavar="DIR", required=True, help="Claude Code transcripts root")
+    rh_parser.add_argument("--claude-code", metavar="DIR", help="Claude Code transcripts root")
+    rh_parser.add_argument("--agentctl-home", metavar="DIR", help="agentctl home (default: ~/.agentctl) for job-store counts")
     rh_parser.add_argument("--baseline", help="a previous healthy reader-health JSON to compare coverage against")
     rh_parser.add_argument("--out", help="write the report JSON here")
+    failures_parser = sub.add_parser(
+        "failures",
+        help="aggregate content-free agentctl failure tags (provider_aup vs usage_limit; never reads input.json)",
+    )
+    failures_parser.add_argument("--agentctl-home", metavar="DIR", help="agentctl home (default: ~/.agentctl)")
+    failures_parser.add_argument("--since", help="only jobs since: 7d, 24h, or an ISO date")
+    failures_parser.add_argument("--out", required=True, help="output directory (failures.json, failures.md)")
+    failures_parser.add_argument(
+        "--allow-drift",
+        action="store_true",
+        help="write even when unknown failureClass values are present (exit still 3 unless allowed)",
+    )
     label_parser = sub.add_parser("label", help="label a sheet interactively; only labels typed at a terminal count")
     label_parser.add_argument("sheet")
     vd_parser = sub.add_parser("verify-detectors",
@@ -342,15 +356,47 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError(f"unknown detector(s): {', '.join(unknown)}")
             return 0 if all(report["detectors"][name]["verdict"] == "predictive" for name in args.require) else 1
         if args.command == "reader-health":
-            from .reader_health import check
+            from .reader_health import check, check_agentctl
 
-            baseline = json.loads(Path(args.baseline).read_text(encoding="utf-8")) if args.baseline else None
-            report = check(args.claude_code, baseline)
-            body = json.dumps(report, indent=2, sort_keys=True) + "\n"
+            if not args.claude_code and not args.agentctl_home:
+                raise ValueError("give --claude-code DIR and/or --agentctl-home DIR")
+            report: dict[str, Any] = {"schema": "sessiongraph.reader-health.bundle.v1"}
+            ok = True
+            if args.claude_code:
+                baseline = json.loads(Path(args.baseline).read_text(encoding="utf-8")) if args.baseline else None
+                claude = check(args.claude_code, baseline)
+                report["claude_code"] = claude
+                ok = ok and claude["verdict"] == "ok"
+            if args.agentctl_home is not None or not args.claude_code:
+                # Explicit --agentctl-home (even empty→default) or agentctl-only mode.
+                home = args.agentctl_home if args.agentctl_home is not None else None
+                agentctl = check_agentctl(home)
+                report["agentctl"] = agentctl
+                ok = ok and agentctl["verdict"] == "ok"
+            body = json.dumps(report if len(report) > 2 else next(
+                v for k, v in report.items() if k != "schema"
+            ), indent=2, sort_keys=True) + "\n"
+            # Prefer a flat report when only one source was requested.
+            if args.claude_code and args.agentctl_home is None:
+                body = json.dumps(report["claude_code"], indent=2, sort_keys=True) + "\n"
+                ok = report["claude_code"]["verdict"] == "ok"
+            elif args.agentctl_home is not None and not args.claude_code:
+                body = json.dumps(report["agentctl"], indent=2, sort_keys=True) + "\n"
+                ok = report["agentctl"]["verdict"] == "ok"
             if args.out:
                 Path(args.out).write_text(body, encoding="utf-8")
             print(body, end="")
-            return 0 if report["verdict"] == "ok" else 1
+            return 0 if ok else 1
+        if args.command == "failures":
+            from . import failures as failures_mod
+
+            doc = failures_mod.aggregate(args.agentctl_home, since=_since(args.since))
+            destination = failures_mod.write_bundle(doc, args.out)
+            print(f"wrote {destination / 'failures.json'}")
+            unknown = int((doc.get("totals") or {}).get("unknown_failure_class") or 0)
+            if unknown and not args.allow_drift:
+                return 3
+            return 0
         if args.command == "label":
             return _label_interactively(args.sheet)
         if args.command == "verify-detectors":

@@ -1,0 +1,25 @@
+{
+  "id": "job_fixture_remap",
+  "kind": "delegate",
+  "ask": {
+    "agent": "codex",
+    "model": "gpt-daybreak-blue-latest",
+    "ok": true,
+    "failureClass": "none"
+  },
+  "policy_remap": {
+    "surface": "mcp_delegate",
+    "requested": {
+      "agent": "cursor",
+      "model": "composer-2.5"
+    },
+    "applied": {
+      "agent": "codex",
+      "model": "gpt-daybreak-blue-latest"
+    },
+    "rule": "security_policy"
+  },
+  "expected_tags": [
+    "policy_remap"
+  ]
+}
