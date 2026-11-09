@@ -1,0 +1,22 @@
+{
+  "id": "job_fixture_aup_write",
+  "kind": "delegate",
+  "ask": {
+    "agent": "codex_write",
+    "model": "gpt-6-luna",
+    "ok": false,
+    "failureClass": "provider_refusal",
+    "refusal": {
+      "provider": "claude",
+      "category": "cyber",
+      "via": "structured"
+    },
+    "needs": [
+      "canModifyRepo"
+    ]
+  },
+  "expected_tags": [
+    "aup_block_on_write",
+    "provider_aup"
+  ]
+}

@@ -191,3 +191,35 @@ def require_healthy(root: str | Path) -> dict[str, Any]:
             f"reader_drift: {', '.join(report['drift'])}. Run `sessiongraph reader-health --claude-code {root}` "
             "for details; nothing was written. Pass --allow-drift to run anyway.")
     return report
+
+
+AGENTCTL_SCHEMA = "sessiongraph.reader-health.agentctl.v1"
+
+
+def check_agentctl(
+    home: str | Path | None = None,
+    *,
+    classified: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Counts for the agentctl job-store reader. Unknown failureClass ⇒ reader_drift."""
+    from .agentctl_jobs import classify_jobs, enrich_with_remaps, iter_jobs, unknown_failure_classes
+    from .failure_tags import KNOWN_FAILURE_CLASSES
+
+    if classified is None:
+        records = enrich_with_remaps(list(iter_jobs(home)), home)
+        classified = classify_jobs(records)
+    unknown = unknown_failure_classes(classified)
+    jobs_seen = len(classified)
+    results_parsed = sum(1 for row in classified if row.get("failureClass") is not None or row.get("tags"))
+    drift: list[str] = []
+    if unknown:
+        drift.append("unknown_failure_class")
+    return {
+        "schema": AGENTCTL_SCHEMA,
+        "verdict": "drift" if drift else "ok",
+        "drift": drift,
+        "jobs_seen": jobs_seen,
+        "results_parsed": results_parsed,
+        "unknown_failure_class": unknown,
+        "known_failure_classes": sorted(KNOWN_FAILURE_CLASSES),
+    }

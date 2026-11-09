@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sessiongraph.failures.v1",
+  "title": "SessionGraph failures aggregate v1",
+  "type": "object",
+  "required": ["schema", "generated_at", "since", "totals", "by_tag", "jobs"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "sessiongraph.failures.v1" },
+    "generated_at": { "type": "string" },
+    "since": { "type": ["string", "null"] },
+    "agentctl_home": { "type": "string" },
+    "reader_health": { "type": "object" },
+    "totals": {
+      "type": "object",
+      "required": ["jobs_seen", "results_parsed", "unknown_failure_class"],
+      "additionalProperties": false,
+      "properties": {
+        "jobs_seen": { "type": "integer", "minimum": 0 },
+        "results_parsed": { "type": "integer", "minimum": 0 },
+        "unknown_failure_class": { "type": "integer", "minimum": 0 },
+        "provider_aup": { "type": "integer", "minimum": 0 },
+        "usage_limit": { "type": "integer", "minimum": 0 },
+        "policy_remap": { "type": "integer", "minimum": 0 },
+        "legacy_relabel": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "by_tag": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "jobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "tags"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "agent": { "type": ["string", "null"] },
+          "model": { "type": ["string", "null"] },
+          "role": { "type": ["string", "null"] },
+          "kind": { "type": ["string", "null"] },
+          "failureClass": { "type": ["string", "null"] },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "legacy_relabel": { "type": "boolean" },
+          "finished_at": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

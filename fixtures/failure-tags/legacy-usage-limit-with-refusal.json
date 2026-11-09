@@ -1,0 +1,16 @@
+{
+  "id": "job_fixture_legacy_refusal",
+  "kind": "delegate",
+  "ask": {
+    "agent": "claude",
+    "model": "claude-opus-5-5",
+    "ok": false,
+    "failureClass": "usage_limit",
+    "evidence": "[{\"type\": \"system\", \"subtype\": \"init\", \"model\": \"claude-opus-4-8\", \"session_id\": \"<redacted>\"}, {\"type\": \"system\", \"subtype\": \"informational\", \"content\": \"<redacted>\", \"level\": \"notice\"}, {\"type\": \"system\", \"subtype\": \"model_refusal_no_fallback\", \"original_model\": \"claude-opus-4-8\", \"api_refusal_category\": \"cyber\", \"api_refusal_explanation\": \"<redacted>\", \"content\": \"\", \"session_id\": \"<redacted>\"}, {\"type\": \"assistant\", \"message\": {\"role\": \"assistant\", \"model\": \"<synthetic>\", \"stop_reason\": \"refusal\", \"stop_details\": {\"type\": \"refusal\", \"category\": \"cyber\", \"explanation\": \"<redacted>\"}, \"content\": [{\"type\": \"text\", \"text\": \"<redacted>\"}]}}, {\"type\": \"result\", \"subtype\": \"success\", \"is_error\": true, \"result\": \"<redacted>\", \"stop_reason\": \"refusal\", \"session_id\": \"<redacted>\", \"total_cost_usd\": 0.01, \"usage\": {\"input_tokens\": 1, \"output_tokens\": 1}}]",
+    "text": "API Error: Opus 5.5's safeguards flagged this session as potential cyber abuse"
+  },
+  "expected_tags": [
+    "legacy_relabel",
+    "provider_aup"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "job_fixture_provider_refusal",
+  "kind": "delegate",
+  "ask": {
+    "agent": "claude",
+    "model": "claude-opus-4-8",
+    "ok": false,
+    "failureClass": "provider_refusal",
+    "refusal": {
+      "provider": "claude",
+      "category": "cyber",
+      "via": "structured"
+    }
+  },
+  "expected_tags": [
+    "provider_aup"
+  ]
+}
